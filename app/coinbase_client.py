@@ -51,7 +51,7 @@ class CoinbaseClient:
 
         assert self._client is not None
         url = f"{self.base_url}{path}"
-        headers = {"User-Agent": "coinbase-crypto-prob-scanner/3-5"}
+        headers = {"User-Agent": "coinbase-crypto-prob-scanner/1.0"}
 
         retries = 5
         backoff = 1.0
@@ -68,7 +68,7 @@ class CoinbaseClient:
                     self.state.last_backoff_seconds = sleep_s
                     self.state.backoff_count += 1
                     await asyncio.sleep(sleep_s)
-                    backoff = min(30.0, backoff * 2.0)
+                    backoff = min(30.0, backoff*2.0)
                     continue
 
             if resp.status_code == 200:
@@ -84,7 +84,7 @@ class CoinbaseClient:
                 self.state.last_backoff_seconds = sleep_s
                 self.state.backoff_count += 1
                 await asyncio.sleep(sleep_s)
-                backoff = min(30.0, backoff * 2.0)
+                backoff = min(30.0, backoff*2.0)
                 continue
 
             self._last_error = f"http_{resp.status_code}"

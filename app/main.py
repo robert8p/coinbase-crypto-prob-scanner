@@ -37,7 +37,7 @@ async def startup_event():
     cb_client = CoinbaseClient(cfg.coinbase_base_url, cfg.coinbase_max_rps, cfg.coinbase_max_inflight, demo_mode=cfg.demo_mode)
     await cb_client.__aenter__()
 
-    # Warm-start: optionally run an immediate scan in the background so you don't see zero coverage until the first :00/:30 tick.
+    # Warm-start: immediate background scan (avoids initial zero coverage)
     async def _warm_start_scan():
         try:
             await asyncio.sleep(max(0, int(cfg.startup_scan_delay_seconds)))
@@ -48,7 +48,6 @@ async def startup_event():
     if cfg.run_scan_on_startup and (not cfg.disable_scheduler):
         asyncio.create_task(_warm_start_scan())
     elif cfg.demo_mode:
-        # Demo mode does an immediate scan for synthetic data
         try:
             await scan_once(cfg, cb_client, universe_mgr, state)
         except Exception as e:

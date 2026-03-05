@@ -67,9 +67,10 @@ class Settings:
     disable_scheduler: bool = False
     debug_password: str | None = None
 
-
+    # Warm-start
     run_scan_on_startup: bool = True
     startup_scan_delay_seconds: int = 2
+
     tod_rvol_lookback_days: int = 20
     tod_rvol_min_days: int = 8
 
@@ -123,9 +124,9 @@ def load_settings() -> Settings:
         disable_scheduler=_bool("DISABLE_SCHEDULER",False),
         debug_password=os.getenv("DEBUG_PASSWORD"),
 
-
         run_scan_on_startup=_bool("RUN_SCAN_ON_STARTUP", True),
         startup_scan_delay_seconds=_int("STARTUP_SCAN_DELAY_SECONDS", 2),
+
         tod_rvol_lookback_days=_int("TOD_RVOL_LOOKBACK_DAYS",20),
         tod_rvol_min_days=_int("TOD_RVOL_MIN_DAYS",8),
 

@@ -12,7 +12,6 @@ def _sigmoid(x: float) -> float:
     return z/(1.0+z)
 
 def score_heuristic(row: pd.Series) -> Dict[str, float]:
-    """Deterministic fallback probabilities for +3% and +5% (conservative)."""
     ret30 = float(row.get("ret_30m",0.0))
     ema = float(row.get("ema_diff_pct",0.0))
     adx = float(row.get("adx",0.0))/50.0
@@ -31,9 +30,9 @@ def score_heuristic(row: pd.Series) -> Dict[str, float]:
     s -= 0.8 * np.tanh(donch*0.7)
     s -= 1.0 * np.tanh((atrp+rv)*10.0)
 
-    # Harder targets => shift probabilities down
-    p1 = _sigmoid(s*0.70 - 0.90)   # +3%
-    p2 = _sigmoid(s*0.60 - 1.60)   # +5%
+    # More conservative mapping for 3%/5%
+    p1 = _sigmoid(s*0.70 - 0.90)
+    p2 = _sigmoid(s*0.60 - 1.60)
 
     p1 = float(min(0.90, max(0.01, p1)))
     p2 = float(min(0.75, max(0.005, p2)))

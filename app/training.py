@@ -19,9 +19,6 @@ from .candles import get_candles_incremental
 from .features import compute_features_5m, ensure_volume_profile_runtime, SCHEMA_VERSION
 from .storage import ensure_dir, atomic_write_json
 
-PCT_PT1 = 0.03  # +3%
-PCT_PT2 = 0.05  # +5%
-
 def _now_utc() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
@@ -140,7 +137,7 @@ class TrainingManager:
                 if feat.empty or len(feat) < max(30, int(cfg.min_bars_5m)):
                     continue
 
-                # Persist ToD profiles as artifacts
+                # Persist volume profiles as training artifacts
                 try:
                     df5tmp = df5.copy()
                     df5tmp["ts_start"] = pd.to_datetime(df5tmp["ts_start"], utc=True)
@@ -150,7 +147,6 @@ class TrainingManager:
                     pass
 
                 if bench_ret is not None:
-                    # feat already contains bench_ret_30m; merge can create suffixes.
                     feat = feat.merge(bench_ret, on="ts_end", how="left", suffixes=("", "_bench"))
                     if "bench_ret_30m_bench" in feat.columns:
                         feat["bench_ret_30m"] = feat["bench_ret_30m_bench"].fillna(feat.get("bench_ret_30m", 0.0)).fillna(0.0)
@@ -164,8 +160,8 @@ class TrainingManager:
 
                 ts_end = pd.to_datetime(feat["ts_end"], utc=True).to_numpy(dtype="datetime64[ns]")
                 p0 = feat["price"].to_numpy(dtype=float)
-                y1 = build_labels(df1, ts_end, int(cfg.horizon_minutes), p0, PCT_PT1)
-                y2 = build_labels(df1, ts_end, int(cfg.horizon_minutes), p0, PCT_PT2)
+                y1 = build_labels(df1, ts_end, int(cfg.horizon_minutes), p0, 0.03)
+                y2 = build_labels(df1, ts_end, int(cfg.horizon_minutes), p0, 0.05)
 
                 feat["product_id"] = pid
                 feat["y1"] = y1
@@ -293,16 +289,16 @@ class TrainingManager:
                 best_bundle["metrics"] = {"auc_val": auc, "brier_val": float(_brier(y[val_idx], p_final)), "best_params": best_params}
                 return best_bundle
 
-            self.status["progress"] = "training pt1 (+3%)"
+            self.status["progress"] = "training pt1 (3%)"
             b1 = train_one("y1")
-            self.status["progress"] = "training pt2 (+5%)"
+            self.status["progress"] = "training pt2 (5%)"
             b2 = train_one("y2")
 
             for pt, bundle in [("pt1", b1), ("pt2", b2)]:
                 out_dir = ensure_dir(Path(cfg.model_dir) / pt)
                 joblib.dump(bundle, out_dir / "bundle.joblib")
 
-            result = {"trained_products": len(prods), "rows": int(len(data)), "pt1_metrics": b1.get("metrics"), "pt2_metrics": b2.get("metrics"), "schema_version": SCHEMA_VERSION, "thresholds": {"pt1": PCT_PT1, "pt2": PCT_PT2}}
+            result = {"trained_products": len(prods), "rows": int(len(data)), "pt1_metrics": b1.get("metrics"), "pt2_metrics": b2.get("metrics"), "schema_version": SCHEMA_VERSION}
             atomic_write_json(Path(cfg.model_dir) / "last_training_result.json", {"finished_at_utc": _now_utc(), "result": result, "per_product": per_prod})
 
             self.status.update({"running": False, "finished_at_utc": _now_utc(), "last_result": result, "last_error": None, "progress":"done"})

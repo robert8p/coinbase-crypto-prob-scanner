@@ -63,7 +63,7 @@ def _slot_5m(ts_end: pd.Timestamp) -> int:
 def _volume_profile_path(cfg: Settings, product_id: str) -> Path:
     return Path(cfg.model_dir) / "volume_profiles" / f"{safe_filename(product_id)}.json"
 
-def ensure_volume_profile_runtime(cfg: Settings, product_id: str, df5m_with_end: pd.DataFrame):
+def ensure_volume_profile_runtime(cfg: Settings, product_id: str, df5m_with_end: pd.DataFrame) -> Tuple[dict, str]:
     prof_dir = Path(cfg.model_dir) / "volume_profiles"
     ensure_dir(prof_dir)
     path = _volume_profile_path(cfg, product_id)
@@ -93,7 +93,7 @@ def ensure_volume_profile_runtime(cfg: Settings, product_id: str, df5m_with_end:
     atomic_write_json(path, obj)
     return obj, "ok"
 
-def load_volume_profile(cfg: Settings, product_id: str):
+def load_volume_profile(cfg: Settings, product_id: str) -> dict | None:
     return read_json(_volume_profile_path(cfg, product_id))
 
 def compute_features_5m(cfg: Settings, df5m_raw: pd.DataFrame, product_id: str, benchmark_ret_30m: float = 0.0, for_training: bool = False):
@@ -125,14 +125,14 @@ def compute_features_5m(cfg: Settings, df5m_raw: pd.DataFrame, product_id: str, 
     ema_diff_pct = ((ema_fast - ema_slow) / (close + 1e-12)).fillna(0.0)
     adx = _adx(df, 14)
 
-    atr = _atr(df, 14).fillna(method="bfill").fillna(0.0)
+    atr = _atr(df, 14).bfill().fillna(0.0)
     atr_pct = (atr / (close + 1e-12)).fillna(0.0)
     logret = np.log((close + 1e-12) / (close.shift(1) + 1e-12)).replace([np.inf,-np.inf],0.0).fillna(0.0)
     rv = logret.rolling(24, min_periods=6).std().fillna(0.0)
 
     pv = (close*vol).rolling(24, min_periods=6).sum()
     vv = vol.rolling(24, min_periods=6).sum()
-    vwap = (pv / (vv + 1e-12)).fillna(method="bfill").fillna(close)
+    vwap = (pv / (vv + 1e-12)).bfill().fillna(close)
     vwap_loc = ((close - vwap) / (atr + 1e-12)).fillna(0.0)
 
     recent_high = high.rolling(72, min_periods=6).max()

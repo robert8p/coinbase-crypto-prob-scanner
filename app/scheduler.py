@@ -38,8 +38,10 @@ def _acquire_lock(lock_path: Path) -> Tuple[bool, object | None]:
         fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         return True, f
     except Exception:
-        try: f.close()
-        except Exception: pass
+        try:
+            f.close()
+        except Exception:
+            pass
         return False, None
 
 class ScanState:
@@ -58,7 +60,7 @@ class ScanState:
         return list(self._skipped[:limit])
 
 async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseManager, state: ScanState) -> None:
-    if getattr(state, 'scan_running', False):
+    if state.scan_running:
         return
     state.scan_running = True
     try:
@@ -151,7 +153,8 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
                     "product": pid, "display_symbol": pid.replace("-","/"),
                     "price": price, "vwap": vwap,
                     "risk": risk, "risk_reasons": risk_reasons,
-                    "prob_1": prob_1, "prob_2": prob_2, "prob_1_source": src, "prob_2_source": src,
+                    "prob_1": prob_1, "prob_2": prob_2,
+                    "prob_1_source": src, "prob_2_source": src,
                     "quote": p.get("quote",""), "category": p.get("status","spot"),
                     "reasons": risk_reasons, "last_candle_time": last_ts.isoformat(),
                     "included": True, "skip_reason": None,
@@ -198,7 +201,6 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
             atomic_write_json(Path(cfg.model_dir) / "last_scores_meta.json", {"last_run_utc": state.last_run_utc, "coverage": state.coverage, "model": state.model_notes, "rows_count": len(state.rows)})
         except Exception:
             pass
-
     finally:
         state.scan_running = False
 
