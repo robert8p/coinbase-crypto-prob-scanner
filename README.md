@@ -74,3 +74,11 @@ CPU-heavy model fitting runs in a worker thread so `/health` stays responsive du
 
 ## Render uptime during training
 This build defaults to **2 uvicorn workers** (set `UVICORN_WORKERS` to change). One worker can stay responsive for `/health` while the other performs CPU-heavy training. Scheduler and training are protected with disk locks so only one runs.
+
+
+## After training
+After models are written, the app drops `rescan_requested.flag` in MODEL_DIR and performs an immediate rescan (cross-worker locked) so the table switches to model probabilities right away.
+
+
+## Universe cache
+When `UNIVERSE_MAX=0` (no cap), the app will refresh a truncated universe cache automatically.

@@ -68,18 +68,28 @@ class UniverseManager:
             if cached and isinstance(cached, dict) and "products" in cached:
                 prods = cached.get("products") or []
                 meta = cached.get("meta") or {}
-                meta.update({"source":"cache","count":len(prods)})
-                return (prods if cfg.universe_max <= 0 else prods[:cfg.universe_max]), meta
+                # If UNIVERSE_MAX is unlimited but the cached product list looks truncated, refresh from live.
+                try:
+                    qd = meta.get("quote_distribution") or {}
+                    qsum = int(sum([int(v) for v in qd.values()])) if isinstance(qd, dict) else 0
+                except Exception:
+                    qsum = 0
+                if cfg.universe_max <= 0 and qsum and len(prods) and qsum > len(prods):
+                    pass  # fall through to live refresh
+                else:
+                    meta.update({"source":"cache","count":len(prods)})
+                    return (prods if cfg.universe_max <= 0 else prods[:cfg.universe_max]), meta
 
         try:
             products = await cb.list_products()
             filtered, meta = self._filter(products)
             rank = {pid:i for i,pid in enumerate(FALLBACK_PRODUCTS)}
             filtered = sorted(filtered, key=lambda x: (0 if x["id"] in rank else 1, rank.get(x["id"], 1_000_000), x["id"]))
-            filtered = filtered if cfg.universe_max <= 0 else filtered[:cfg.universe_max]
-            meta.update({"source":"live","count":len(filtered)})
-            atomic_write_json(self.cache_path, {"products": filtered, "meta": meta, "updated_at_utc": _now_utc().isoformat()})
-            return filtered, meta
+            filtered_all = filtered
+            meta.update({"source":"live","count":len(filtered_all),"full_count":len(filtered_all)})
+            atomic_write_json(self.cache_path, {"products": filtered_all, "meta": meta, "updated_at_utc": _now_utc().isoformat()})
+            filtered_out = (filtered_all if cfg.universe_max <= 0 else filtered_all[:cfg.universe_max])
+            return filtered_out, meta
         except Exception as e:
             stable = set([s.upper() for s in cfg.stablecoin_bases])
             allow_quotes = set([q.upper() for q in cfg.quote_allowlist])
@@ -93,5 +103,7 @@ class UniverseManager:
                     excluded += 1
                     continue
                 fallback.append({"id": pid.upper(), "base": base.upper(), "quote": quote.upper(), "status":"fallback"})
-            fallback = fallback if cfg.universe_max <= 0 else fallback[:cfg.universe_max]
-            return fallback, {"source":"fallback","count":len(fallback),"excluded_stablecoin_base_count":excluded,"error":f"{type(e).__name__}: {e}"}
+            fallback_all = fallback
+            meta = {"source":"fallback","count":len(fallback_all),"full_count":len(fallback_all),"excluded_stablecoin_base_count":excluded,"error":f"{type(e).__name__}: {e}"}
+            fallback_out = (fallback_all if cfg.universe_max <= 0 else fallback_all[:cfg.universe_max])
+            return fallback_out, meta

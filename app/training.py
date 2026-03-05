@@ -358,6 +358,13 @@ class TrainingManager:
                 out_dir = ensure_dir(Path(cfg.model_dir) / pt)
                 joblib.dump(bundle, out_dir / "bundle.joblib")
 
+            # Request an immediate rescan so the UI/scores switch to the new models without waiting for the next scheduler tick.
+            try:
+                rescan_flag = Path(cfg.model_dir) / "rescan_requested.flag"
+                rescan_flag.write_text(_now_utc(), encoding="utf-8")
+            except Exception:
+                pass
+
             result = {
                 "trained_products": len(prods),
                 "rows": int(len(data)),

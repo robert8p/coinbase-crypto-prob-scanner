@@ -67,6 +67,11 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
     if (Path(cfg.model_dir) / PAUSE_FILE).exists():
         return
 
+    # Cross-worker scan lock (prevents multiple workers doing the same heavy scan)
+    lock_ok, scan_handle = _acquire_lock(Path(cfg.model_dir) / "scan.lock")
+    if not lock_ok:
+        return
+
     state.scan_running = True
     try:
         scan_time = _now().replace(second=0, microsecond=0)
@@ -209,6 +214,11 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
         except Exception:
             pass
     finally:
+        try:
+            if scan_handle is not None:
+                scan_handle.close()
+        except Exception:
+            pass
         state.scan_running = False
 
 async def scheduler_loop(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseManager, state: ScanState) -> None:
@@ -227,7 +237,6 @@ def try_start_scheduler(cfg: Settings, cb: CoinbaseClient, universe_mgr: Univers
     lock_path = Path(cfg.model_dir) / "scheduler.lock"
     ok, handle = _acquire_lock(lock_path)
     if not ok:
-        state.last_error = "scheduler_lock_not_acquired"
         return False
     state._lock_handle = handle
     asyncio.create_task(scheduler_loop(cfg, cb, universe_mgr, state))

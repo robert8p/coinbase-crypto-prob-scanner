@@ -13,6 +13,7 @@ from .coinbase_client import CoinbaseClient
 from .universe import UniverseManager
 from .scheduler import ScanState, scan_once, try_start_scheduler
 from .training import TrainingManager, PAUSE_FILE
+from .model import load_model
 from .storage import read_json, atomic_write_json, ensure_dir
 
 def _now_utc() -> str:
@@ -30,6 +31,7 @@ app = FastAPI(title="Coinbase Crypto Prob Scanner (3% / 5%)")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 state = ScanState()
+scheduler_leader: bool = False
 universe_mgr = UniverseManager(cfg)
 training_mgr = TrainingManager(cfg)
 cb_client: CoinbaseClient | None = None
@@ -44,7 +46,8 @@ async def startup_event():
     cb_client = CoinbaseClient(cfg.coinbase_base_url, cfg.coinbase_max_rps, cfg.coinbase_max_inflight, demo_mode=cfg.demo_mode)
     await cb_client.__aenter__()
 
-    try_start_scheduler(cfg, cb_client, universe_mgr, state)
+    global scheduler_leader
+    scheduler_leader = try_start_scheduler(cfg, cb_client, universe_mgr, state)
 
     async def _warm_start_scan():
         try:
@@ -99,6 +102,27 @@ async def startup_event():
 
     asyncio.create_task(_auto_train())
 
+    async def _rescan_after_training_loop():
+        # If training writes a rescan flag, perform exactly one scan (cross-worker locked) and clear the flag.
+        while True:
+            try:
+                await asyncio.sleep(10)
+                if cb_client is None:
+                    continue
+                flag = Path(cfg.model_dir) / "rescan_requested.flag"
+                if not flag.exists():
+                    continue
+                await scan_once(cfg, cb_client, universe_mgr, state)
+                try:
+                    flag.unlink()
+                except Exception:
+                    pass
+            except Exception as e:
+                state.last_error = f"rescan_after_training_error:{type(e).__name__}: {e}"
+
+    asyncio.create_task(_rescan_after_training_loop())
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     global cb_client
@@ -136,6 +160,18 @@ async def api_status():
     tpath = Path(cfg.model_dir) / "training_status.json"
     tstat = read_json(tpath) if tpath.exists() else None
     training_view = tstat if isinstance(tstat, dict) else training_mgr.status
+
+    # Live model status (do not rely on last scan snapshot)
+    pt1 = load_model(cfg.model_dir, "pt1")
+    pt2 = load_model(cfg.model_dir, "pt2")
+    using = "model" if (pt1.ok and pt2.ok) else "heuristic"
+    model_view = {
+        "using": using,
+        "pt1": {"ok": pt1.ok, "reason": pt1.reason, "target": "3%"},
+        "pt2": {"ok": pt2.ok, "reason": pt2.reason, "target": "5%"},
+        "schema_warning": None if (pt1.ok and pt2.ok) else "Model missing or incompatible; heuristic fallback in use.",
+    }
+    state.model_notes = model_view
 
     return {
         "now_utc": _now_utc(),
@@ -176,9 +212,10 @@ async def api_status():
             },
         },
         "universe": (state.coverage.get("universe_meta") if state.coverage else None),
-        "model": state.model_notes,
+        "model": model_view,
         "training": training_view,
         "scan": {"running": state.scan_running, "paused_for_training": pause},
+        "scheduler": {"leader": scheduler_leader},
         "coverage": state.coverage or {
             "universe_count": 0,
             "products_requested_count": 0,
