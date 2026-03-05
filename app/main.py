@@ -1,4 +1,5 @@
 import datetime as dt
+import asyncio
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request, HTTPException
@@ -36,11 +37,22 @@ async def startup_event():
     cb_client = CoinbaseClient(cfg.coinbase_base_url, cfg.coinbase_max_rps, cfg.coinbase_max_inflight, demo_mode=cfg.demo_mode)
     await cb_client.__aenter__()
 
-    try:
-        if cfg.demo_mode:
+    # Warm-start: optionally run an immediate scan in the background so you don't see zero coverage until the first :00/:30 tick.
+    async def _warm_start_scan():
+        try:
+            await asyncio.sleep(max(0, int(cfg.startup_scan_delay_seconds)))
             await scan_once(cfg, cb_client, universe_mgr, state)
-    except Exception as e:
-        state.last_error = f"startup_scan_error:{type(e).__name__}: {e}"
+        except Exception as e:
+            state.last_error = f"startup_scan_error:{type(e).__name__}: {e}"
+
+    if cfg.run_scan_on_startup and (not cfg.disable_scheduler):
+        asyncio.create_task(_warm_start_scan())
+    elif cfg.demo_mode:
+        # Demo mode does an immediate scan for synthetic data
+        try:
+            await scan_once(cfg, cb_client, universe_mgr, state)
+        except Exception as e:
+            state.last_error = f"startup_scan_error:{type(e).__name__}: {e}"
 
     try_start_scheduler(cfg, cb_client, universe_mgr, state)
 
@@ -98,6 +110,7 @@ async def api_status():
         "universe": (state.coverage.get("universe_meta") if state.coverage else None),
         "model": state.model_notes,
         "training": training_mgr.status,
+        "scan": {"running": state.scan_running},
         "coverage": state.coverage or {
             "universe_count": 0,
             "products_requested_count": 0,

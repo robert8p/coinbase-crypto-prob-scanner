@@ -150,8 +150,13 @@ class TrainingManager:
                     pass
 
                 if bench_ret is not None:
-                    feat = feat.merge(bench_ret, on="ts_end", how="left")
-                    feat["bench_ret_30m"] = feat["bench_ret_30m"].fillna(0.0)
+                    # feat already contains bench_ret_30m; merge can create suffixes.
+                    feat = feat.merge(bench_ret, on="ts_end", how="left", suffixes=("", "_bench"))
+                    if "bench_ret_30m_bench" in feat.columns:
+                        feat["bench_ret_30m"] = feat["bench_ret_30m_bench"].fillna(feat.get("bench_ret_30m", 0.0)).fillna(0.0)
+                        feat = feat.drop(columns=["bench_ret_30m_bench"], errors="ignore")
+                    else:
+                        feat["bench_ret_30m"] = feat.get("bench_ret_30m", 0.0)
 
                 df1 = df1.copy()
                 df1["ts_start"] = pd.to_datetime(df1["ts_start"], utc=True)

@@ -163,3 +163,8 @@ If `/api/status` shows rate limiting / backoffs:
 - `DEMO_MODE` (default `false`)
 - `DISABLE_SCHEDULER` (default `0`)
 - `DEBUG_PASSWORD` (optional; also accepted by `/api/debug/coverage`)
+
+
+### Optional warm-start (avoids initial zero coverage)
+- `RUN_SCAN_ON_STARTUP` (default `true`) — run an immediate background scan right after boot
+- `STARTUP_SCAN_DELAY_SECONDS` (default `2`) — delay before that warm-start scan
