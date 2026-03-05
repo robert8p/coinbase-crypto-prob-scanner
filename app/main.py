@@ -1,9 +1,10 @@
 import datetime as dt
 import asyncio
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -11,10 +12,15 @@ from .config import load_settings, Settings
 from .coinbase_client import CoinbaseClient
 from .universe import UniverseManager
 from .scheduler import ScanState, scan_once, try_start_scheduler
-from .training import TrainingManager
+from .training import TrainingManager, PAUSE_FILE
 
 def _now_utc() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+def _models_missing(cfg: Settings) -> bool:
+    p1 = Path(cfg.model_dir) / "pt1" / "bundle.joblib"
+    p2 = Path(cfg.model_dir) / "pt2" / "bundle.joblib"
+    return (not p1.exists()) or (not p2.exists())
 
 cfg: Settings = load_settings()
 templates = Jinja2Templates(directory="app/templates")
@@ -37,7 +43,8 @@ async def startup_event():
     cb_client = CoinbaseClient(cfg.coinbase_base_url, cfg.coinbase_max_rps, cfg.coinbase_max_inflight, demo_mode=cfg.demo_mode)
     await cb_client.__aenter__()
 
-    # Warm-start: immediate background scan (avoids initial zero coverage)
+    try_start_scheduler(cfg, cb_client, universe_mgr, state)
+
     async def _warm_start_scan():
         try:
             await asyncio.sleep(max(0, int(cfg.startup_scan_delay_seconds)))
@@ -47,13 +54,49 @@ async def startup_event():
 
     if cfg.run_scan_on_startup and (not cfg.disable_scheduler):
         asyncio.create_task(_warm_start_scan())
-    elif cfg.demo_mode:
-        try:
-            await scan_once(cfg, cb_client, universe_mgr, state)
-        except Exception as e:
-            state.last_error = f"startup_scan_error:{type(e).__name__}: {e}"
 
-    try_start_scheduler(cfg, cb_client, universe_mgr, state)
+    async def _auto_train():
+        try:
+            if not cfg.auto_train_on_startup:
+                return
+            if not cfg.admin_password:
+                return
+            if not _models_missing(cfg):
+                return
+
+            guard_path = Path(cfg.model_dir) / "auto_train_guard.json"
+            now = dt.datetime.now(dt.timezone.utc)
+            if guard_path.exists():
+                try:
+                    import json
+                    j = json.loads(guard_path.read_text(encoding="utf-8"))
+                    last = dt.datetime.fromisoformat(j.get("last_attempt_utc"))
+                    age_min = (now - last).total_seconds()/60.0
+                    if age_min < float(cfg.auto_train_cooldown_minutes):
+                        return
+                except Exception:
+                    pass
+
+            await asyncio.sleep(5)
+            products, _ = await universe_mgr.resolve_universe(cb_client)
+
+            try:
+                import json
+                guard_path.parent.mkdir(parents=True, exist_ok=True)
+                guard_path.write_text(json.dumps({"last_attempt_utc": now.isoformat()}), encoding="utf-8")
+            except Exception:
+                pass
+
+            training_mgr.start(
+                cb_client,
+                products,
+                max_products=int(cfg.auto_train_max_products),
+                lookback_days=int(cfg.auto_train_lookback_days),
+            )
+        except Exception as e:
+            state.last_error = f"auto_train_error:{type(e).__name__}: {e}"
+
+    asyncio.create_task(_auto_train())
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -66,6 +109,10 @@ async def shutdown_event():
 async def dashboard(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.head("/")
+async def head_root():
+    return Response(status_code=200)
+
 @app.get("/health")
 async def health():
     return {"ok": True}
@@ -74,6 +121,7 @@ async def health():
 async def api_status():
     global cb_client, cfg
     cb_status = cb_client.status() if cb_client is not None else None
+    pause = (Path(cfg.model_dir) / PAUSE_FILE).exists()
     return {
         "now_utc": _now_utc(),
         "config": {
@@ -92,6 +140,12 @@ async def api_status():
             "coinbase_max_rps": cfg.coinbase_max_rps,
             "coinbase_max_inflight": cfg.coinbase_max_inflight,
             "model_dir": cfg.model_dir,
+            "auto_train": {
+                "enabled": cfg.auto_train_on_startup,
+                "max_products": cfg.auto_train_max_products,
+                "lookback_days": cfg.auto_train_lookback_days,
+                "cooldown_minutes": cfg.auto_train_cooldown_minutes,
+            },
         },
         "coinbase": {
             "ok": cb_status.ok if cb_status else False,
@@ -109,7 +163,7 @@ async def api_status():
         "universe": (state.coverage.get("universe_meta") if state.coverage else None),
         "model": state.model_notes,
         "training": training_mgr.status,
-        "scan": {"running": state.scan_running},
+        "scan": {"running": state.scan_running, "paused_for_training": pause},
         "coverage": state.coverage or {
             "universe_count": 0,
             "products_requested_count": 0,

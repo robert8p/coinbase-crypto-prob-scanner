@@ -14,6 +14,8 @@ from .heuristic import score_heuristic
 from .model import load_model, predict_proba
 from .storage import ensure_dir, atomic_write_json
 
+PAUSE_FILE = "pause_scans.flag"
+
 try:
     import fcntl  # type: ignore
 except Exception:
@@ -62,6 +64,9 @@ class ScanState:
 async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseManager, state: ScanState) -> None:
     if state.scan_running:
         return
+    if (Path(cfg.model_dir) / PAUSE_FILE).exists():
+        return
+
     state.scan_running = True
     try:
         scan_time = _now().replace(second=0, microsecond=0)
@@ -69,7 +74,7 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
 
         bench_ret_30m = 0.0
         try:
-            bench5 = await get_candles_incremental(cb, cfg.model_dir, cfg.benchmark_symbol, 300, scan_time - dt.timedelta(hours=12), scan_time, demo_seed=123)
+            bench5 = await get_candles_incremental(cb, cfg.model_dir, cfg.benchmark_symbol, 300, scan_time - dt.timedelta(hours=12), scan_time)
             bench_feat, _ = compute_features_5m(cfg, bench5, cfg.benchmark_symbol, benchmark_ret_30m=0.0, for_training=False)
             if not bench_feat.empty:
                 bench_ret_30m = float(bench_feat.iloc[-1]["ret_30m"])
@@ -90,7 +95,7 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
         for p in prods:
             pid = p["id"]
             try:
-                df5 = await get_candles_incremental(cb, cfg.model_dir, pid, 300, scan_time - dt.timedelta(hours=48), scan_time, demo_seed=abs(hash(pid))%1000+1)
+                df5 = await get_candles_incremental(cb, cfg.model_dir, pid, 300, scan_time - dt.timedelta(hours=48), scan_time)
                 if df5.empty:
                     skip_counts["no_candles"] = skip_counts.get("no_candles",0)+1
                     skipped.append({"product":pid,"reason":"no_candles","last_candle":None})

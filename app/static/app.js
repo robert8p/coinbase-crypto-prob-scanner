@@ -104,7 +104,9 @@ async function fetchStatus() {
   const keys = Object.keys(skip);
   setText("skipReasons", keys.length ? "Skip reasons: " + keys.slice(0, 10).map(k => `${k}(${skip[k]})`).join(" • ") : "Skip reasons: —");
 
-  setText("lastError", s.last_error ? `Last error: ${s.last_error}` : "");
+  const scan = s.scan || {};
+  const pause = scan.paused_for_training ? " (paused for training)" : "";
+  setText("lastError", s.last_error ? `Last error: ${s.last_error}` : (scan.running ? "Scan running..." : `OK${pause}`));
 
   const t = s.training || {};
   if (t.running) setText("trainStatus", `TRAINING... ${t.progress || ""}`);

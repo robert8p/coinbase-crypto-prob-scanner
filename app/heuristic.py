@@ -30,7 +30,6 @@ def score_heuristic(row: pd.Series) -> Dict[str, float]:
     s -= 0.8 * np.tanh(donch*0.7)
     s -= 1.0 * np.tanh((atrp+rv)*10.0)
 
-    # More conservative mapping for 3%/5%
     p1 = _sigmoid(s*0.70 - 0.90)
     p2 = _sigmoid(s*0.60 - 1.60)
 

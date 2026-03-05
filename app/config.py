@@ -67,9 +67,13 @@ class Settings:
     disable_scheduler: bool = False
     debug_password: str | None = None
 
-    # Warm-start
     run_scan_on_startup: bool = True
     startup_scan_delay_seconds: int = 2
+
+    auto_train_on_startup: bool = True
+    auto_train_max_products: int = 20
+    auto_train_lookback_days: int = 14
+    auto_train_cooldown_minutes: int = 720
 
     tod_rvol_lookback_days: int = 20
     tod_rvol_min_days: int = 8
@@ -126,6 +130,11 @@ def load_settings() -> Settings:
 
         run_scan_on_startup=_bool("RUN_SCAN_ON_STARTUP", True),
         startup_scan_delay_seconds=_int("STARTUP_SCAN_DELAY_SECONDS", 2),
+
+        auto_train_on_startup=_bool("AUTO_TRAIN_ON_STARTUP", True),
+        auto_train_max_products=_int("AUTO_TRAIN_MAX_PRODUCTS", 20),
+        auto_train_lookback_days=_int("AUTO_TRAIN_LOOKBACK_DAYS", 14),
+        auto_train_cooldown_minutes=_int("AUTO_TRAIN_COOLDOWN_MINUTES", 720),
 
         tod_rvol_lookback_days=_int("TOD_RVOL_LOOKBACK_DAYS",20),
         tod_rvol_min_days=_int("TOD_RVOL_MIN_DAYS",8),

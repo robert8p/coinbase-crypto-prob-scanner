@@ -1,7 +1,7 @@
 import asyncio
 import datetime as dt
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import joblib
 import numpy as np
@@ -18,6 +18,8 @@ from .coinbase_client import CoinbaseClient
 from .candles import get_candles_incremental
 from .features import compute_features_5m, ensure_volume_profile_runtime, SCHEMA_VERSION
 from .storage import ensure_dir, atomic_write_json
+
+PAUSE_FILE = "pause_scans.flag"
 
 def _now_utc() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
@@ -95,30 +97,42 @@ class TrainingManager:
     def __init__(self, cfg: Settings):
         self.cfg = cfg
         self._task: asyncio.Task | None = None
+        self._override_max_products: Optional[int] = None
+        self._override_lookback_days: Optional[int] = None
         self.status: dict = {"running": False, "started_at_utc": None, "finished_at_utc": None, "last_result": None, "last_error": None, "progress": None}
 
     def is_running(self) -> bool:
         return bool(self.status.get("running"))
 
-    def start(self, cb: CoinbaseClient, products: List[Dict[str,str]]) -> None:
+    def start(self, cb: CoinbaseClient, products: List[Dict[str,str]], *, max_products: int | None = None, lookback_days: int | None = None) -> None:
         if self.is_running():
             return
+        self._override_max_products = max_products
+        self._override_lookback_days = lookback_days
         self.status.update({"running": True, "started_at_utc": _now_utc(), "finished_at_utc": None, "last_result": None, "last_error": None, "progress":"starting"})
         self._task = asyncio.create_task(self._run(cb, products))
 
     async def _run(self, cb: CoinbaseClient, products: List[Dict[str,str]]) -> None:
+        pause_path = Path(self.cfg.model_dir) / PAUSE_FILE
         try:
+            ensure_dir(Path(self.cfg.model_dir))
+            pause_path.write_text("training", encoding="utf-8")
+
             cfg = self.cfg
+            max_products = self._override_max_products if self._override_max_products is not None else cfg.train_max_products
+            lookback_days = self._override_lookback_days if self._override_lookback_days is not None else cfg.train_lookback_days
+
             prods = products
-            if cfg.train_max_products and int(cfg.train_max_products) > 0:
-                prods = prods[: int(cfg.train_max_products)]
+            if not max_products or int(max_products) <= 0:
+                max_products = 50  # safe auto-cap
+            prods = prods[: int(max_products)]
             if not prods:
                 raise RuntimeError("no_products_to_train")
 
             end = dt.datetime.now(dt.timezone.utc).replace(second=0, microsecond=0)
-            start = end - dt.timedelta(days=int(cfg.train_lookback_days)+2)
+            start = end - dt.timedelta(days=int(lookback_days)+2)
 
-            bench5 = await get_candles_incremental(cb, cfg.model_dir, cfg.benchmark_symbol, 300, start, end, demo_seed=123)
+            bench5 = await get_candles_incremental(cb, cfg.model_dir, cfg.benchmark_symbol, 300, start, end)
             bench_feat, _ = compute_features_5m(cfg, bench5, cfg.benchmark_symbol, benchmark_ret_30m=0.0, for_training=True)
             bench_ret = bench_feat[["ts_end","ret_30m"]].rename(columns={"ret_30m":"bench_ret_30m"}) if not bench_feat.empty else None
 
@@ -127,8 +141,9 @@ class TrainingManager:
             for i, p in enumerate(prods):
                 pid = p["id"]
                 self.status["progress"] = f"download {i+1}/{len(prods)} {pid}"
-                df5 = await get_candles_incremental(cb, cfg.model_dir, pid, 300, start, end, demo_seed=abs(hash(pid))%1000+1)
-                df1 = await get_candles_incremental(cb, cfg.model_dir, pid, 60, start, end, demo_seed=abs(hash(pid))%1000+7)
+
+                df5 = await get_candles_incremental(cb, cfg.model_dir, pid, 300, start, end)
+                df1 = await get_candles_incremental(cb, cfg.model_dir, pid, 60, start, end)
                 per_prod[pid] = {"candles5_rows": int(len(df5)), "candles1_rows": int(len(df1))}
                 if df5.empty or df1.empty:
                     continue
@@ -137,7 +152,6 @@ class TrainingManager:
                 if feat.empty or len(feat) < max(30, int(cfg.min_bars_5m)):
                     continue
 
-                # Persist volume profiles as training artifacts
                 try:
                     df5tmp = df5.copy()
                     df5tmp["ts_start"] = pd.to_datetime(df5tmp["ts_start"], utc=True)
@@ -229,7 +243,7 @@ class TrainingManager:
                         best_b, best_a = b, float(a)
                 return best_a, float(best_b)
 
-            def train_one(target: str) -> dict:
+            def train_one(target: str, label: str) -> dict:
                 y = data[target].to_numpy(dtype=int)
                 X = data[feature_names].copy()
                 best_bundle = None
@@ -273,6 +287,7 @@ class TrainingManager:
                             }
 
                 assert best_bundle is not None and best_params is not None
+
                 Xv = data[feature_names].iloc[val_idx]
                 raw = best_bundle["pipeline"].predict_proba(Xv)[:,1]
                 bval = np.array([_bucket_id(x) for x in data.iloc[val_idx]["time_remaining_frac"].to_numpy(dtype=float)], dtype=int)
@@ -286,21 +301,35 @@ class TrainingManager:
                     auc = float(roc_auc_score(y[val_idx], p_final))
                 except Exception:
                     auc = None
-                best_bundle["metrics"] = {"auc_val": auc, "brier_val": float(_brier(y[val_idx], p_final)), "best_params": best_params}
+                best_bundle["metrics"] = {"auc_val": auc, "brier_val": float(_brier(y[val_idx], p_final)), "best_params": best_params, "target": label}
                 return best_bundle
 
             self.status["progress"] = "training pt1 (3%)"
-            b1 = train_one("y1")
+            b1 = train_one("y1", "3%")
             self.status["progress"] = "training pt2 (5%)"
-            b2 = train_one("y2")
+            b2 = train_one("y2", "5%")
 
             for pt, bundle in [("pt1", b1), ("pt2", b2)]:
                 out_dir = ensure_dir(Path(cfg.model_dir) / pt)
                 joblib.dump(bundle, out_dir / "bundle.joblib")
 
-            result = {"trained_products": len(prods), "rows": int(len(data)), "pt1_metrics": b1.get("metrics"), "pt2_metrics": b2.get("metrics"), "schema_version": SCHEMA_VERSION}
+            result = {
+                "trained_products": len(prods),
+                "rows": int(len(data)),
+                "pt1_metrics": b1.get("metrics"),
+                "pt2_metrics": b2.get("metrics"),
+                "schema_version": SCHEMA_VERSION,
+                "lookback_days": int(lookback_days),
+                "max_products": int(max_products),
+            }
             atomic_write_json(Path(cfg.model_dir) / "last_training_result.json", {"finished_at_utc": _now_utc(), "result": result, "per_product": per_prod})
 
             self.status.update({"running": False, "finished_at_utc": _now_utc(), "last_result": result, "last_error": None, "progress":"done"})
         except Exception as e:
             self.status.update({"running": False, "finished_at_utc": _now_utc(), "last_error": f"{type(e).__name__}: {e}", "progress":"error"})
+        finally:
+            try:
+                if pause_path.exists():
+                    pause_path.unlink()
+            except Exception:
+                pass
