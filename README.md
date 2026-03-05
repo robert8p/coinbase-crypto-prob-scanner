@@ -40,7 +40,7 @@ HORIZON_MODE=FIXED
 
 QUOTE_ALLOWLIST=USD,USDT,USDC
 EXCLUDE_STABLECOIN_BASE=true
-UNIVERSE_MAX=250
+UNIVERSE_MAX=0  # 0 = all eligible products (no cap)
 UNIVERSE_REFRESH_MINUTES=360
 
 COINBASE_MAX_RPS=5
@@ -56,4 +56,21 @@ MAX_CANDLE_STALENESS_MINUTES=60
 - `AUTO_TRAIN_ON_STARTUP` (default `true`)
 - `AUTO_TRAIN_MAX_PRODUCTS` (default `20`)
 - `AUTO_TRAIN_LOOKBACK_DAYS` (default `14`)
-- `AUTO_TRAIN_COOLDOWN_MINUTES` (default `720`)  # prevents repeated retries
+- `AUTO_TRAIN_COOLDOWN_MINUTES` (default `60`)  # prevents repeated retries
+
+
+## Render health-check safety
+CPU-heavy model fitting runs in a worker thread so `/health` stays responsive during training.
+
+
+## Universe size
+- Set `UNIVERSE_MAX=0` to scan **all** eligible products (no cap).
+
+
+## Training size
+- `TRAIN_MAX_PRODUCTS=0` means **no cap** (train on all resolved products).
+- `AUTO_TRAIN_MAX_PRODUCTS` controls only the startup auto-train (default 20).
+
+
+## Render uptime during training
+This build defaults to **2 uvicorn workers** (set `UVICORN_WORKERS` to change). One worker can stay responsive for `/health` while the other performs CPU-heavy training. Scheduler and training are protected with disk locks so only one runs.

@@ -204,6 +204,8 @@ async def scan_once(cfg: Settings, cb: CoinbaseClient, universe_mgr: UniverseMan
         try:
             ensure_dir(Path(cfg.model_dir))
             atomic_write_json(Path(cfg.model_dir) / "last_scores_meta.json", {"last_run_utc": state.last_run_utc, "coverage": state.coverage, "model": state.model_notes, "rows_count": len(state.rows)})
+            # Persist rows so other workers can serve /api/scores reliably
+            atomic_write_json(Path(cfg.model_dir) / "last_scores.json", {"last_run_utc": state.last_run_utc, "rows": state.rows})
         except Exception:
             pass
     finally:

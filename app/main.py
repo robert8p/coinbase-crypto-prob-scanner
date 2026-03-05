@@ -13,6 +13,7 @@ from .coinbase_client import CoinbaseClient
 from .universe import UniverseManager
 from .scheduler import ScanState, scan_once, try_start_scheduler
 from .training import TrainingManager, PAUSE_FILE
+from .storage import read_json, atomic_write_json, ensure_dir
 
 def _now_utc() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
@@ -64,7 +65,7 @@ async def startup_event():
             if not _models_missing(cfg):
                 return
 
-            guard_path = Path(cfg.model_dir) / "auto_train_guard.json"
+            guard_path = Path(cfg.model_dir) / "auto_train_guard_v2.json"
             now = dt.datetime.now(dt.timezone.utc)
             if guard_path.exists():
                 try:
@@ -122,6 +123,20 @@ async def api_status():
     global cb_client, cfg
     cb_status = cb_client.status() if cb_client is not None else None
     pause = (Path(cfg.model_dir) / PAUSE_FILE).exists()
+    # Multi-worker safety: read last scan snapshot from disk (written by the scheduler-holding worker)
+    meta_path = Path(cfg.model_dir) / "last_scores_meta.json"
+    meta = read_json(meta_path) if meta_path.exists() else None
+    disk_coverage = (meta.get("coverage") if isinstance(meta, dict) else None) or None
+    disk_model = (meta.get("model") if isinstance(meta, dict) else None) or None
+    if (not state.coverage) and disk_coverage:
+        state.coverage = disk_coverage
+    if (not state.model_notes) and disk_model:
+        state.model_notes = disk_model
+    # Training status persisted by training worker
+    tpath = Path(cfg.model_dir) / "training_status.json"
+    tstat = read_json(tpath) if tpath.exists() else None
+    training_view = tstat if isinstance(tstat, dict) else training_mgr.status
+
     return {
         "now_utc": _now_utc(),
         "config": {
@@ -162,7 +177,7 @@ async def api_status():
         },
         "universe": (state.coverage.get("universe_meta") if state.coverage else None),
         "model": state.model_notes,
-        "training": training_mgr.status,
+        "training": training_view,
         "scan": {"running": state.scan_running, "paused_for_training": pause},
         "coverage": state.coverage or {
             "universe_count": 0,
@@ -179,6 +194,12 @@ async def api_status():
 
 @app.get("/api/scores")
 async def api_scores():
+    # Multi-worker safety: if this worker has no in-memory rows, read from disk snapshot
+    if not state.rows:
+        spath = Path(cfg.model_dir) / "last_scores.json"
+        snap = read_json(spath) if spath.exists() else None
+        if isinstance(snap, dict) and isinstance(snap.get("rows"), list):
+            return {"now_utc": _now_utc(), "last_run_utc": snap.get("last_run_utc"), "rows": snap.get("rows")}
     return {"now_utc": _now_utc(), "last_run_utc": state.last_run_utc, "rows": state.rows or []}
 
 @app.post("/train")
@@ -199,7 +220,9 @@ async def train(body: Dict[str, Any]):
 
 @app.get("/api/training/status")
 async def training_status():
-    return training_mgr.status
+    tpath = Path(cfg.model_dir) / "training_status.json"
+    tstat = read_json(tpath) if tpath.exists() else None
+    return tstat if isinstance(tstat, dict) else training_mgr.status
 
 @app.get("/api/debug/coverage")
 async def debug_coverage(password: str):

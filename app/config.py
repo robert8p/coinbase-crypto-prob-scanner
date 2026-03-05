@@ -44,7 +44,7 @@ class Settings:
     quote_allowlist: List[str] = None  # type: ignore
     exclude_stablecoin_base: bool = True
     stablecoin_bases: List[str] = None  # type: ignore
-    universe_max: int = 250
+    universe_max: int = 0
     universe_refresh_minutes: int = 360
     min_24h_dollar_volume: float = 0.0
 
@@ -73,7 +73,7 @@ class Settings:
     auto_train_on_startup: bool = True
     auto_train_max_products: int = 20
     auto_train_lookback_days: int = 14
-    auto_train_cooldown_minutes: int = 720
+    auto_train_cooldown_minutes: int = 60
 
     tod_rvol_lookback_days: int = 20
     tod_rvol_min_days: int = 8
@@ -105,7 +105,7 @@ def load_settings() -> Settings:
         quote_allowlist=quote_allow,
         exclude_stablecoin_base=_bool("EXCLUDE_STABLECOIN_BASE", True),
         stablecoin_bases=stable_bases,
-        universe_max=_int("UNIVERSE_MAX",250),
+        universe_max=_int("UNIVERSE_MAX",0),
         universe_refresh_minutes=_int("UNIVERSE_REFRESH_MINUTES",360),
         min_24h_dollar_volume=_float("MIN_24H_DOLLAR_VOLUME",0.0),
 
@@ -134,7 +134,7 @@ def load_settings() -> Settings:
         auto_train_on_startup=_bool("AUTO_TRAIN_ON_STARTUP", True),
         auto_train_max_products=_int("AUTO_TRAIN_MAX_PRODUCTS", 20),
         auto_train_lookback_days=_int("AUTO_TRAIN_LOOKBACK_DAYS", 14),
-        auto_train_cooldown_minutes=_int("AUTO_TRAIN_COOLDOWN_MINUTES", 720),
+        auto_train_cooldown_minutes=_int("AUTO_TRAIN_COOLDOWN_MINUTES", 60),
 
         tod_rvol_lookback_days=_int("TOD_RVOL_LOOKBACK_DAYS",20),
         tod_rvol_min_days=_int("TOD_RVOL_MIN_DAYS",8),

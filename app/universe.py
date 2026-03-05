@@ -61,7 +61,7 @@ class UniverseManager:
         cfg = self.cfg
         if cfg.crypto_universe:
             prods = [{"id": s, "base": s.split("-")[0], "quote": s.split("-")[1], "status":"env"} for s in cfg.crypto_universe if "-" in s]
-            return prods[:cfg.universe_max], {"source":"env","count":len(prods)}
+            return (prods if cfg.universe_max <= 0 else prods[:cfg.universe_max]), {"source":"env","count":len(prods)}
 
         if self._cache_fresh():
             cached = read_json(self.cache_path)
@@ -69,14 +69,14 @@ class UniverseManager:
                 prods = cached.get("products") or []
                 meta = cached.get("meta") or {}
                 meta.update({"source":"cache","count":len(prods)})
-                return prods[:cfg.universe_max], meta
+                return (prods if cfg.universe_max <= 0 else prods[:cfg.universe_max]), meta
 
         try:
             products = await cb.list_products()
             filtered, meta = self._filter(products)
             rank = {pid:i for i,pid in enumerate(FALLBACK_PRODUCTS)}
             filtered = sorted(filtered, key=lambda x: (0 if x["id"] in rank else 1, rank.get(x["id"], 1_000_000), x["id"]))
-            filtered = filtered[:cfg.universe_max]
+            filtered = filtered if cfg.universe_max <= 0 else filtered[:cfg.universe_max]
             meta.update({"source":"live","count":len(filtered)})
             atomic_write_json(self.cache_path, {"products": filtered, "meta": meta, "updated_at_utc": _now_utc().isoformat()})
             return filtered, meta
@@ -93,5 +93,5 @@ class UniverseManager:
                     excluded += 1
                     continue
                 fallback.append({"id": pid.upper(), "base": base.upper(), "quote": quote.upper(), "status":"fallback"})
-            fallback = fallback[:cfg.universe_max]
+            fallback = fallback if cfg.universe_max <= 0 else fallback[:cfg.universe_max]
             return fallback, {"source":"fallback","count":len(fallback),"excluded_stablecoin_base_count":excluded,"error":f"{type(e).__name__}: {e}"}
