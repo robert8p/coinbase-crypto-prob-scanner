@@ -1,0 +1,123 @@
+services:
+  - type: web
+    name: coinbase-crypto-prob-scanner
+    env: docker
+    disk:
+      name: model-disk
+      mountPath: /var/data
+      sizeGB: 4
+    envVars:
+      - key: MODEL_DIR
+        value: /var/data/model
+      - key: DEMO_MODE
+        value: false
+      - key: DISABLE_SCHEDULER
+        value: false
+      - key: STARTUP_SCAN
+        value: true
+      - key: SCAN_INTERVAL_MINUTES
+        value: 15
+      - key: PREFERRED_COINBASE_RUNTIME
+        value: exchange_public
+      - key: TARGET_MOVE_PCT
+        value: 0.02
+      - key: TARGET_HORIZON_MINUTES
+        value: 240
+      - key: QUALITY_MAX_MAE
+        value: "-0.020"
+      - key: QUALITY_MIN_END_RET
+        value: "-0.008"
+      - key: UNIVERSE_POLICY
+        value: full_eligible
+      - key: LIVE_UNIVERSE_MODE
+        value: trained_cohort
+      - key: UNIVERSE_TOP_N
+        value: 120
+      - key: UNIVERSE_MAX_PRODUCTS
+        value: 0
+      - key: UNIVERSE_QUOTES
+        value: USD,USDC
+      - key: EXCLUDE_STABLECOINS
+        value: true
+      - key: UNIVERSE_MIN_LISTING_AGE_DAYS
+        value: 21
+      - key: UNIVERSE_MIN_HISTORY_5M_BARS
+        value: 288
+      - key: UNIVERSE_MIN_OBSERVED_5M_BARS
+        value: 36
+      - key: UNIVERSE_MIN_24H_DOLLAR_VOLUME_USD
+        value: 500000
+      - key: UNIVERSE_MIN_ACTIVITY_RATE
+        value: 0.40
+      - key: UNIVERSE_MAX_ILLIQUIDITY_PROXY
+        value: 0.06
+      - key: STAGE1_LIGHT_CALENDAR_5M_BARS
+        value: 864
+      - key: STAGE1_LIGHT_FEATURE_5M_BARS
+        value: 300
+      - key: STAGE1_MIN_HISTORY_5M_BARS
+        value: 96
+      - key: STAGE1_MIN_OBSERVED_5M_BARS
+        value: 18
+      - key: STAGE1_SELECTION_MODE
+        value: stage1_opportunity_model
+      - key: STAGE1_MAX_CANDIDATES
+        value: 40
+      - key: LIVE_RAW_THRESHOLD
+        value: 0.35
+      - key: LIVE_SELECTION_MODE
+        value: legacy
+      - key: UTILITY_SHORTLIST_TARGET_MAX_NAMES
+        value: 8
+      - key: UTILITY_SHORTLIST_SCORE_FLOOR
+        value: 0.52
+      - key: UTILITY_SHORTLIST_SCORE_DROPOFF
+        value: 0.16
+      - key: UTILITY_CONFIDENCE_FLOOR
+        value: 0.28
+      - key: UTILITY_TIER3_MAX_FRAC
+        value: 0.25
+      - key: STAGE1_PANIC_MAX_CANDIDATES
+        value: 40
+      - key: STAGE2_LOOKBACK_5M_BARS
+        value: 2400
+      - key: STAGE2_MIN_HISTORY_5M_BARS
+        value: 288
+      - key: STAGE2_MIN_OBSERVED_5M_BARS
+        value: 48
+      - key: STAGE2_MAX_NAMES
+        value: 50
+      - key: STAGE2_PANIC_MAX_NAMES
+        value: 15
+      - key: STAGE2_MIN_DOLLAR_VOLUME_HARD
+        value: 100000
+      - key: STAGE2_MIN_DOLLAR_VOLUME_SOFT
+        value: 250000
+      - key: DOWNSIDE_CAP
+        value: 0.78
+      - key: UNCERTAINTY_CAP
+        value: 0.72
+      - key: EVENT_RISK_CAP
+        value: 0.70
+      - key: BTC_PANIC_THRESHOLD
+        value: -0.025
+      - key: PANIC_THRESHOLD_BOOST
+        value: 0.10
+      - key: TRAIN_LOOKBACK_DAYS
+        value: 120
+      - key: TRAIN_MAX_SYMBOLS
+        value: 100
+      - key: TRAIN_FEATURE_WARMUP_5M_BARS
+        value: 288
+      - key: TRAIN_SAMPLE_EVERY_N_BARS
+        value: 3
+      - key: PAPER_TRADE_LOG_ENABLED
+        value: true
+      - key: HTTP_TIMEOUT_SECONDS
+        value: 15
+      - key: REQUEST_PAUSE_SECONDS
+        value: 0.08
+      - key: MAX_WORKERS
+        value: 2
+      - key: LOG_LEVEL
+        value: INFO

@@ -1,0 +1,6 @@
+v4.18.8
+
+- fixes utility policy search status/summary coherence so stale status no longer disagrees with the latest summary verdict
+- auto-triggers one fresh offline family search when shadow review is blocked by the offline gate and no active challenger remains
+- surfaces next_policy_search in the blocked shadow outcome review
+- keeps legacy live unchanged

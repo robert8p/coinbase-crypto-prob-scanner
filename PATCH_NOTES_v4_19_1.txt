@@ -1,0 +1,20 @@
+Coinbase Crypto Prob Scanner v4.19.1
+
+Hotfix purpose
+- Fix Raw Score Baseline Lab runtime failure introduced in v4.19.0.
+
+Root cause
+- The replay service was partially wired for capture_full_rankable_rows, but the new flag was not threaded through _execute_replay_window and _run_replay_scan.
+- Result: the UI baseline run failed immediately with an unexpected keyword argument error instead of producing the offline baseline pack.
+
+What changed
+- Added capture_full_rankable_rows to HistoricalReplayService._execute_replay_window.
+- Added capture_full_rankable_rows to HistoricalReplayService._run_replay_scan.
+- Aggregated captured_rankable_rows across replay timestamps so RawScoreBaselineService receives the full resolved stage-2 rankable set it expects.
+- Bumped version to 4.19.1.
+
+Live-path impact
+- No intended change to live selection semantics.
+- Legacy remains the effective live selection engine.
+- Stage 1 remains stage1_opportunity_model.
+- Effective live raw threshold remains 0.35.

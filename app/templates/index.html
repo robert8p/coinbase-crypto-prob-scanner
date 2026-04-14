@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coinbase Crypto Prob Scanner v{{ app_version }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#0b1020; color:#eef2ff; margin:0; padding:24px; }
+    h1,h2,h3 { margin:0 0 12px; }
+    .muted { color:#a5b4fc; }
+    .banner { background:#172554; border:1px solid #3b82f6; padding:12px 16px; border-radius:10px; margin-bottom:18px; }
+    .regime-green { background:#052e16; border-color:#16a34a; }
+    .regime-amber { background:#451a03; border-color:#d97706; }
+    .regime-red { background:#450a0a; border-color:#dc2626; }
+    .regime-pending { background:#1f2937; border-color:#94a3b8; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
+    .card { background:#111827; border:1px solid #243041; border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,0.18); }
+    .version-tag { font-size:12px; color:#64748b; margin-left:8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    table { width:100%; border-collapse:collapse; margin-top:18px; background:#111827; border-radius:12px; overflow:hidden; }
+    th, td { padding:10px 12px; border-bottom:1px solid #1f2937; font-size:14px; vertical-align:top; }
+    th { text-align:left; background:#0f172a; position:sticky; top:0; }
+    th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+    th.sortable:hover { background:#13203a; }
+    th.sortable.active { color:#93c5fd; }
+    th.sortable .sort-indicator { font-size:11px; color:#64748b; margin-left:4px; }
+    th.sortable.active .sort-indicator { color:#93c5fd; }
+    .pill { display:inline-block; border:1px solid #374151; border-radius:999px; padding:2px 8px; font-size:12px; color:#93c5fd; margin-right:6px; }
+    .pill-lgbm { color:#86efac; border-color:#16a34a; }
+    .risk-low { color:#86efac; }
+    .risk-mid { color:#fde68a; }
+    .risk-high { color:#fca5a5; }
+    button { background:#2563eb; color:white; border:none; border-radius:10px; padding:10px 14px; cursor:pointer; }
+    button:disabled { opacity:0.45; cursor:not-allowed; filter:grayscale(35%); }
+    .hint { color:#93c5fd; font-size:12px; }
+    .pill-disabled { display:inline-block; padding:4px 10px; border-radius:999px; background:#374151; color:#e5e7eb; font-size:12px; font-weight:600; }
+    input { background:#0f172a; color:white; border:1px solid #334155; border-radius:10px; padding:10px 12px; }
+    .small { font-size:12px; }
+    .control-group { display:flex; flex-direction:column; gap:6px; min-width:160px; }
+    .control-group .label { font-size:12px; color:#94a3b8; font-weight:600; letter-spacing:0.02em; }
+    .progress-shell { width:100%; height:10px; border-radius:999px; background:#0f172a; border:1px solid #334155; overflow:hidden; }
+    .progress-bar { height:100%; width:35%; border-radius:999px; background:#2563eb; transform:translateX(-120%); }
+    .progress-bar.running { animation: replay-indeterminate 1.2s linear infinite; }
+    @keyframes replay-indeterminate { 0% { transform:translateX(-120%); } 100% { transform:translateX(320%); } }
+  </style>
+</head>
+<body>
+  <h1>Coinbase Crypto Prob Scanner <span class="version-tag">v{{ app_version }}</span></h1>
+  <p class="muted">v{{ app_version }} supports live evidence review, offline decision labs, and post-falsification audit branches without forcing live-logic changes through the UI.</p>
+
+  <div id="scanBanner" class="banner">Loading status…</div>
+  <section id="statusPanel"></section>
+  <section id="modelOutputDistributionPanel" style="margin-top:14px;"></section>
+
+  <div class="card" style="margin-top:14px;">
+    <p class="muted">Direct operator-share downloads for the most commonly requested review items. These are plain anchor links rather than JS-triggered downloads.</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="/api/status.txt"><button type="button">Download Status TXT</button></a>
+      <a href="/health.txt"><button type="button">Download Health TXT</button></a>
+      <a href="/api/reviews/current-version-summary.txt"><button type="button">Download Current-Version Summary TXT</button></a>
+      <a href="/api/model-output-distribution.txt"><button type="button">Download Model Output Distribution TXT</button></a>
+      <a href="/api/reviews/raw-score-baseline/summary.txt"><button type="button">Download Raw Score Baseline TXT</button></a>
+      <a href="/api/reviews/post-maturity-bundle.zip"><button type="button">Download Post-Maturity Bundle</button></a>
+      <a href="/api/reviews/fresh-retrain-audit/summary"><button type="button">Open Fresh Retrain Audit Summary JSON</button></a>
+      <a href="/api/reviews/fresh-retrain-audit/summary.txt"><button type="button">Download Fresh Retrain Audit Summary TXT</button></a>
+      <a href="/api/reviews/fresh-retrain-audit/latest-pack.zip"><button type="button">Download Fresh Retrain Audit Pack</button></a>
+    </div>
+  </div>
+
+  <h2 style="margin-top:24px;">Deployment reality</h2>
+  <div class="card">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <a href="/api/reviews/current-version.zip"><button type="button">Download current-version bundle</button></a>
+      <a href="/api/reviews/current-version-summary"><button type="button">Open current-version summary JSON</button></a>
+    </div>
+    <div id="currentVersionSummaryPanel"><p class="muted">Loading current-version evidence summary…</p></div>
+  </div>
+
+
+<h2 style="margin-top:24px;">Decision branch automation</h2>
+<div class="card">
+  <p class="muted">This panel shows the post-checkpoint branch state, whether supported next actions can auto-execute in-app, and the operator controls for acknowledging or overriding the branch automation.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="decisionBranchAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <button id="toggleDecisionBranchAutoExecuteButton" type="button">Toggle auto-execute</button>
+    <button id="executeDecisionBranchButton" type="button">Execute branch now</button>
+    <button id="clearDecisionBranchOverrideButton" type="button">Clear active override</button>
+    <button id="ackDecisionBranchButton" type="button">Acknowledge branch</button>
+  </div>
+  <div id="decisionBranchMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="decisionBranchPanel"><p class="muted">Loading decision branch automation…</p></div>
+</div>
+
+  <h2 style="margin-top:24px;">Review packs</h2>
+  <div class="card">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <a href="/api/reviews/post-maturity-bundle.zip"><button type="button">Download automated post-maturity bundle</button></a>
+      <a href="/api/reviews/diagnostic-battery.txt"><button type="button">Download diagnostic battery TXT</button></a>
+      <a href="/api/training/orchestration/status.txt"><button type="button">Download training orchestration TXT</button></a>
+      <a href="/api/reviews/current-version.zip"><button type="button">Download all scan packs since v{{ app_version }} deployed</button></a>
+      <a href="/api/reviews/latest-scan.zip"><button type="button">Download latest scan pack</button></a>
+      <a href="/api/reviews/latest-evaluated.zip"><button type="button">Download latest evaluated pack</button></a>
+      <a href="/api/reviews/last-24h.zip"><button type="button">Download last 24h pack</button></a>
+      <a href="/api/reviews/last-7d.zip"><button type="button">Download last 7d pack</button></a>
+    </div>
+    <div id="reviewRunsPanel"><p class="muted">Loading review runs…</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Policy audit</h2>
+  <div class="card">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <a href="/api/reviews/last-24h.zip"><button type="button">Download last 24h audit pack</button></a>
+      <a href="/api/reviews/last-7d.zip"><button type="button">Download last 7d audit pack</button></a>
+    </div>
+    <div id="policyAuditPanel"><p class="muted">Loading policy audit…</p></div>
+  </div>
+
+  <h2 style="margin-top:24px;">Historical Replay</h2>
+  <div class="card">
+    <p class="muted">Run a historical live-emulation replay and counterfactual stage1 opportunity audit without leaving the UI.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="replayAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="replayHours" type="number" min="1" step="1" value="24" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="replayStepMinutes" type="number" min="5" step="5" value="60" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="replayMaxScans" type="number" min="1" step="1" value="24" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="replayMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <div class="control-group">
+        <div class="label">Pipeline mode</div>
+        <select id="replayPipelineMode">
+          <option value="full">full</option>
+          <option value="raw_threshold" selected>raw_threshold</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <div class="label">Raw threshold</div>
+        <input id="replayRawThreshold" type="number" min="0" max="1" step="0.01" value="0.30" />
+      </div>
+      <button id="runReplayButton" type="button">Run Replay</button>
+      <button id="loadReplaySummaryButton" type="button">Load Latest Replay Summary</button>
+      <button id="downloadReplayPackButton" type="button">Download Latest Replay Pack</button>
+    </div>
+    <p class="small muted" style="margin-top:0;">Hours = replay window. Step minutes = spacing between replay scans. Max scans = hard cap on replay timestamps. Max symbols = how many cohort symbols to include. Pipeline mode = full pipeline or raw-threshold ablation. Raw threshold is only used by raw_threshold mode.</p>
+    <div id="replayMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="replayProgressPanel" class="card" style="margin-bottom:12px;">
+      <p><strong>Replay progress:</strong> <span id="replayProgressText">Idle</span></p>
+      <div class="progress-shell"><div id="replayProgressBar" class="progress-bar"></div></div>
+      <p class="small muted" id="replayElapsedText" style="margin-top:8px;">No replay currently running.</p>
+    </div>
+    <div id="replayPanel"><p class="muted">Replay summary not loaded yet.</p></div>
+  </div>
+
+
+
+
+  <h2 style="margin-top:24px;">Stage1 Opportunity Scorer</h2>
+  <div class="card">
+    <p class="muted">Build a dedicated stage1 opportunity scorer from the latest replay-labeled stage1 rows, then inspect its validation summary without leaving the UI.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="stage1OpportunityAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <button id="buildStage1OpportunityButton" type="button">Build from Latest Replay Pack</button>
+      <button id="loadStage1OpportunitySummaryButton" type="button">Load Scorer Summary</button>
+    </div>
+    <div id="stage1OpportunityMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="stage1OpportunityPanel"><p class="muted">No stage1 opportunity scorer summary loaded yet.</p></div>
+  </div>
+
+  <h2 style="margin-top:24px;">Model Audit</h2>
+  <div class="card">
+    <p class="muted">Build a replay-based model audit from the latest replay pack. This checks raw model ordering quality, calibration deciles, tail precision, and per-symbol resolved performance.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="modelAuditAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <button id="buildModelAuditButton" type="button">Build from Latest Replay Pack</button>
+      <button id="loadModelAuditSummaryButton" type="button">Load Model Audit Summary</button>
+    </div>
+    <div id="modelAuditMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="modelAuditPanel"><p class="muted">No model audit summary loaded yet.</p></div>
+  </div>
+
+  <h2 style="margin-top:24px;">Raw Score Baseline Lab</h2>
+  <div class="card">
+    <p class="muted">Run one replay-backed baseline that captures every resolved stage-2 rankable row before display trimming, then judge whether raw model ranking is useful before doing more shortlist-policy work.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="rawScoreBaselineAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="rawScoreBaselineHours" type="number" min="24" step="24" value="168" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="rawScoreBaselineStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="rawScoreBaselineMaxScans" type="number" min="1" step="1" value="84" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="rawScoreBaselineMaxSymbols" type="number" min="10" step="1" value="100" />
+      </div>
+      <button id="runRawScoreBaselineButton" type="button">Run Raw Score Baseline</button>
+      <button id="loadRawScoreBaselineSummaryButton" type="button">Load Raw Score Baseline Summary</button>
+      <button id="downloadRawScoreBaselinePackButton" type="button">Download Raw Score Baseline Pack</button>
+      <a href="/api/reviews/raw-score-baseline/summary.txt"><button type="button">Download Raw Score Baseline TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">This is the governing next step when shortlist-policy search is exhausted. It answers whether the raw model tail and ranking are actually useful, and whether downstream shaping is compressing them.</p>
+    <div id="rawScoreBaselineMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="rawScoreBaselinePanel"><p class="muted">No raw score baseline summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Benchmark Lab</h2>
+  <div class="card">
+    <p class="muted">Run the raw-threshold sweep automatically and classify symbols from current evaluated evidence so you can use the waiting period productively without manual spreadsheet work.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="benchmarkAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="benchmarkHours" type="number" min="1" step="1" value="96" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="benchmarkStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="benchmarkMaxScans" type="number" min="1" step="1" value="48" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="benchmarkMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <div class="control-group">
+        <div class="label">Thresholds</div>
+        <input id="benchmarkThresholds" type="text" value="0.25,0.30,0.35,0.40" />
+      </div>
+      <button id="runBenchmarkButton" type="button">Run Threshold Sweep</button>
+      <button id="loadBenchmarkSummaryButton" type="button">Load Benchmark Summary</button>
+      <button id="downloadBenchmarkPackButton" type="button">Download Benchmark Pack</button>
+      <button id="downloadClassificationPackButton" type="button">Download Classification Pack</button>
+    </div>
+    <p class="small muted" style="margin-top:0;">This runs the same replay window at multiple raw thresholds and assembles the comparison automatically. It may take a while because it performs several replays in sequence.</p>
+    <div id="benchmarkMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="benchmarkPanel"><p class="muted">No benchmark summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Offline Challenger Family Search Lab</h2>
+<div class="card">
+  <p class="muted">Material step forward: run multiple shortlist policy challengers on the same replay frame so you can stop swapping one live heuristic at a time.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityPolicySearchAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Hours</div>
+      <input id="utilityPolicySearchHours" type="number" min="24" step="24" value="168" />
+    </div>
+    <div class="control-group">
+      <div class="label">Step minutes</div>
+      <input id="utilityPolicySearchStepMinutes" type="number" min="5" step="5" value="120" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max scans</div>
+      <input id="utilityPolicySearchMaxScans" type="number" min="1" step="1" value="84" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max symbols</div>
+      <input id="utilityPolicySearchMaxSymbols" type="number" min="10" step="1" value="100" />
+    </div>
+    <button id="runUtilityPolicySearchButton" type="button">Run Offline Challenger Family Search</button>
+    <button id="loadUtilityPolicySearchStatusButton" type="button">Load Offline Family Search Status</button>
+    <button id="loadUtilityPolicySearchSummaryButton" type="button">Load Offline Family Search Summary</button>
+    <button id="downloadUtilityPolicySearchPackButton" type="button" disabled>Download Offline Family Search Pack</button>
+    <a id="downloadUtilityPolicySearchSummaryTxtLink" href="/api/utility-policy-search/summary.txt" aria-disabled="true"><button id="downloadUtilityPolicySearchSummaryTxtButton" type="button" disabled>Download Offline Family Search Summary TXT</button></a>
+    <a href="/api/utility-policy-search/status.txt"><button type="button">Download Offline Family Search Status TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this before shipping another shortlist-engine change. It ranks multiple policy challengers against the same legacy baseline in one offline run.</p>
+  <div id="utilityPolicySearchMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityPolicySearchStatusPanel" class="card" style="margin-bottom:10px;"><p class="muted">No offline family search status loaded yet.</p></div>
+  <div id="utilityPolicySearchPanel"><p class="muted">No offline family search summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Shadow Selection Comparison</h2>
+<div class="card">
+  <p class="muted">Automatic evidence layer: keep legacy live, but score a bounded concurrent shadow set of the top near-miss challengers on each completed scan so incumbent-vs-challenger differences are visible without risking live quality.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadShadowSelectionComparisonSummaryButton" type="button">Load Shadow Comparison Summary</button>
+    <button id="downloadShadowSelectionComparisonPackButton" type="button" disabled title="Pack unavailable until a recorded shadow comparison exists">Download Shadow Comparison Pack</button>
+    <a href="/api/shadow-selection-comparison/summary.txt"><button type="button">Download Shadow Comparison Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">This runs automatically after each completed scan when legacy is live and eligible challenger policies exist from Utility Policy Search.</p>
+  <div id="shadowSelectionComparisonMessage" class="muted" style="margin-bottom:6px;"></div>
+  <div id="shadowSelectionComparisonPackHint" class="hint" style="margin-bottom:10px;">Pack unavailable until a recorded comparison exists.</div>
+  <div id="shadowSelectionComparisonPanel"><p class="muted">No shadow comparison summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Shadow Selection Outcome Review</h2>
+<div class="card">
+  <p class="muted">Matured review of recorded shadow comparisons. It waits until the 240-minute target horizon has passed, then checks whether any challenger in the bounded shadow set actually beat the legacy shortlist on the same scans.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadShadowSelectionOutcomeReviewButton" type="button">Load Shadow Outcome Review</button>
+    <button id="downloadShadowSelectionOutcomeReviewPackButton" type="button" disabled title="Pack unavailable until at least one recorded shadow comparison has matured">Shadow Outcome Review Pack Not Ready</button>
+    <a href="/api/shadow-selection-outcome-review/summary.txt"><button type="button">Download Shadow Outcome Review TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">This review becomes meaningful only after recorded shadow comparisons have matured past the target horizon.</p>
+  <div id="shadowSelectionOutcomeReviewMessage" class="muted" style="margin-bottom:6px;"></div>
+  <div id="shadowSelectionOutcomeReviewPackHint" class="hint" style="margin-bottom:10px;">Pack unavailable until at least one recorded shadow comparison has matured.</div>
+  <div id="shadowSelectionOutcomeReviewPanel"><p class="muted">No shadow outcome review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Utility Selection Lab</h2>
+<div class="card">
+  <p class="muted">Offline validator for the new utility-constrained shortlist engine. It compares the utility shortlist against the legacy ranked-cap shortlist on the same replay frame.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilitySelectionLabAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Hours</div>
+      <input id="utilitySelectionLabHours" type="number" min="1" step="1" value="168" />
+    </div>
+    <div class="control-group">
+      <div class="label">Step minutes</div>
+      <input id="utilitySelectionLabStepMinutes" type="number" min="5" step="5" value="120" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max scans</div>
+      <input id="utilitySelectionLabMaxScans" type="number" min="1" step="1" value="84" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max symbols</div>
+      <input id="utilitySelectionLabMaxSymbols" type="number" min="1" step="1" value="100" />
+    </div>
+    <button id="runUtilitySelectionLabButton" type="button">Run Utility Selection Lab</button>
+    <button id="loadUtilitySelectionLabSummaryButton" type="button">Load Utility Selection Lab Summary</button>
+    <button id="downloadUtilitySelectionLabPackButton" type="button">Download Utility Selection Lab Pack</button>
+    <a href="/api/utility-selection-lab/summary.txt"><button type="button">Download Utility Selection Lab Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this before trusting the new live shortlist logic. It answers whether utility-constrained selection actually beats the legacy shortlist offline.</p>
+  <div id="utilitySelectionLabMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilitySelectionLabPanel"><p class="muted">No utility selection lab summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Utility Operator Automation</h2>
+<div class="card">
+  <p class="muted">One click, then leave. This orchestrator runs the offline labs, chooses the supported branch, activates proof, waits for evidence, activates adoption when justified, and can rollback if post-adoption review rejects the adopted path.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityOperatorAutomationAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <button id="startUtilityOperatorAutomationButton" type="button">Start Utility Autopilot</button>
+    <button id="stopUtilityOperatorAutomationButton" type="button">Stop Utility Autopilot</button>
+    <button id="loadUtilityOperatorAutomationStatusButton" type="button">Load Utility Autopilot Status</button>
+    <button id="downloadUtilityOperatorAutomationPackButton" type="button">Download Utility Autopilot Pack</button>
+    <a href="/api/utility-operator-automation/status.txt"><button type="button">Download Utility Autopilot Status TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">The automation prefers the utility-model branch first, falls back to utility-tuning if needed, and only advances when the evidence gates are supportive.</p>
+  <div id="utilityOperatorAutomationMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityOperatorAutomationPanel"><p class="muted">No utility operator automation status loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Utility Model Challenger Lab</h2>
+<div class="card">
+  <p class="muted">Offline-only model challenger. It trains a first utility-aligned model head and compares its scan-level shortlist utility against the incumbent event model on the same holdout frame.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityModelLabAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max symbols</div>
+      <input id="utilityModelLabMaxSymbols" type="number" min="1" step="1" value="0" />
+    </div>
+    <div class="control-group">
+      <div class="label">Visible cap</div>
+      <input id="utilityModelLabVisibleCap" type="number" min="1" step="1" value="0" />
+    </div>
+    <button id="runUtilityModelLabButton" type="button">Run Utility Model Lab</button>
+    <button id="loadUtilityModelLabSummaryButton" type="button">Load Utility Model Lab Summary</button>
+    <button id="downloadUtilityModelLabPackButton" type="button">Download Utility Model Lab Pack</button>
+    <a href="/api/utility-model-lab/summary.txt"><button type="button">Download Utility Model Lab Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this when the shortlist logic looks directionally right but the model objective still appears misaligned. It is the first real model-side tranche of the redesign.</p>
+  <div id="utilityModelLabMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityModelLabPanel"><p class="muted">No utility model lab summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Model Proof</h2>
+<div class="card">
+  <p class="muted">Bounded live proof for the exact utility-model challenger, while holding the current utility shortlist semantics fixed.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityModelProofAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Proof hours</div>
+      <input id="utilityModelProofHours" type="number" min="1" step="1" value="24" />
+    </div>
+    <button id="activateUtilityModelProofButton" type="button">Activate Utility Model Proof</button>
+    <button id="clearUtilityModelProofButton" type="button">Clear Utility Model Proof</button>
+    <button id="loadUtilityModelProofSummaryButton" type="button">Load Utility Model Proof</button>
+    <button id="downloadUtilityModelProofPackButton" type="button">Download Utility Model Proof Pack</button>
+    <a href="/api/utility-model-proof/summary.txt"><button type="button">Download Utility Model Proof TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the utility model lab explicitly supports the challenger. It changes the model, not the shortlist semantics.</p>
+  <div id="utilityModelProofMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityModelProofPanel"><p class="muted">No utility model proof summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Model Proof Review</h2>
+<div class="card">
+  <p class="muted">Isolated proof-window review for the utility-model challenger. It asks whether the challenger’s visible shortlist is actually beating the hidden remainder in live conditions.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadUtilityModelProofReviewSummaryButton" type="button">Load Utility Model Proof Review</button>
+    <button id="downloadUtilityModelProofReviewPackButton" type="button">Download Utility Model Proof Review Pack</button>
+    <a href="/api/utility-model-proof-review/summary.txt"><button type="button">Download Utility Model Proof Review TXT</button></a>
+  </div>
+  <div id="utilityModelProofReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityModelProofReviewPanel"><p class="muted">No utility model proof review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Model Adoption</h2>
+<div class="card">
+  <p class="muted">This is the gated adoption step after isolated utility-model proof. It only allows adoption when the offline winner and the isolated live proof winner still line up, and it preserves a rollback path.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityModelAdoptionAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <button id="activateUtilityModelAdoptionButton" type="button">Activate Utility Model Adoption</button>
+    <button id="clearUtilityModelAdoptionButton" type="button">Clear Utility Model Adoption</button>
+    <button id="loadUtilityModelAdoptionSummaryButton" type="button">Load Utility Model Adoption</button>
+    <button id="downloadUtilityModelAdoptionPackButton" type="button">Download Utility Model Adoption Pack</button>
+    <a href="/api/utility-model-adoption/summary.txt"><button type="button">Download Utility Model Adoption TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the isolated proof review supports the utility-model challenger. It is the rollback-aware bridge from proof-window success to a real adopted live path.</p>
+  <div id="utilityModelAdoptionMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityModelAdoptionPanel"><p class="muted">No utility model adoption summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Utility Tuning Lab</h2>
+<div class="card">
+  <p class="muted">Offline tuner for the utility-constrained selection engine. It searches a focused grid of decision-score weights and shortlist gates on the same replay frame.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityTuningLabAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Hours</div>
+      <input id="utilityTuningLabHours" type="number" min="1" step="1" value="168" />
+    </div>
+    <div class="control-group">
+      <div class="label">Step minutes</div>
+      <input id="utilityTuningLabStepMinutes" type="number" min="5" step="5" value="120" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max scans</div>
+      <input id="utilityTuningLabMaxScans" type="number" min="1" step="1" value="84" />
+    </div>
+    <div class="control-group">
+      <div class="label">Max symbols</div>
+      <input id="utilityTuningLabMaxSymbols" type="number" min="1" step="1" value="100" />
+    </div>
+    <button id="runUtilityTuningLabButton" type="button">Run Utility Tuning Lab</button>
+    <button id="loadUtilityTuningLabSummaryButton" type="button">Load Utility Tuning Lab Summary</button>
+    <button id="downloadUtilityTuningLabPackButton" type="button">Download Utility Tuning Lab Pack</button>
+    <a href="/api/utility-tuning-lab/summary.txt"><button type="button">Download Utility Tuning Lab Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this after the utility selection engine is directionally supported. It tunes the utility weights and shortlist gates against the same shortlist utility objective.</p>
+  <div id="utilityTuningLabMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityTuningLabPanel"><p class="muted">No utility tuning lab summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Tuning Proof</h2>
+<div class="card">
+  <p class="muted">Bounded live proof for the exact utility parameter bundle recommended by the Utility Tuning Lab. This avoids manual env edits and preserves deployment-scope attribution.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityTuningProofAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Proof hours</div>
+      <input id="utilityTuningProofHours" type="number" min="1" step="1" value="24" />
+    </div>
+    <button id="activateUtilityTuningProofButton" type="button">Activate Utility Tuning Proof</button>
+    <button id="clearUtilityTuningProofButton" type="button">Clear Utility Tuning Proof</button>
+    <button id="loadUtilityTuningProofSummaryButton" type="button">Load Utility Tuning Proof</button>
+    <button id="downloadUtilityTuningProofPackButton" type="button">Download Utility Tuning Proof Pack</button>
+    <a href="/api/utility-tuning-proof/summary.txt"><button type="button">Download Utility Tuning Proof TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the tuning lab explicitly supports an offline parameter bundle. It activates that exact bundle in a bounded proof window.</p>
+  <div id="utilityTuningProofMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityTuningProofPanel"><p class="muted">No utility tuning proof summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Tuning Proof Review</h2>
+<div class="card">
+  <p class="muted">This isolates matured live evidence from the exact tuned utility bundle instead of relying on contaminated current-version aggregates.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadUtilityTuningProofReviewSummaryButton" type="button">Load Utility Tuning Proof Review</button>
+    <button id="downloadUtilityTuningProofReviewPackButton" type="button">Download Utility Tuning Proof Review Pack</button>
+    <a href="/api/utility-tuning-proof-review/summary.txt"><button type="button">Download Utility Tuning Proof Review TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this after or during the proof window to decide whether the tuned utility bundle deserves a real live update.</p>
+  <div id="utilityTuningProofReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityTuningProofReviewPanel"><p class="muted">No utility tuning proof review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Tuning Adoption</h2>
+<div class="card">
+  <p class="muted">This is the gated step after isolated utility proof. It only allows adoption when the offline tuned winner and the isolated live proof winner still line up, and it preserves a rollback path.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="utilityTuningAdoptionAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <button id="activateUtilityTuningAdoptionButton" type="button">Activate Utility Tuning Adoption</button>
+    <button id="clearUtilityTuningAdoptionButton" type="button">Clear Utility Tuning Adoption</button>
+    <button id="loadUtilityTuningAdoptionSummaryButton" type="button">Load Utility Tuning Adoption</button>
+    <button id="downloadUtilityTuningAdoptionPackButton" type="button">Download Utility Tuning Adoption Pack</button>
+    <a href="/api/utility-tuning-adoption/summary.txt"><button type="button">Download Utility Tuning Adoption TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the isolated proof review supports the tuned bundle. It is the rollback-aware bridge from proof-window success to a real adopted live utility path.</p>
+  <div id="utilityTuningAdoptionMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityTuningAdoptionPanel"><p class="muted">No utility tuning adoption summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Utility Tuning Adoption Review</h2>
+<div class="card">
+  <p class="muted">This is the keep-versus-rollback layer for the adopted tuned utility path. It isolates matured evidence from the exact adoption session instead of relying on mixed current-version aggregates.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadUtilityTuningAdoptionReviewSummaryButton" type="button">Load Utility Tuning Adoption Review</button>
+    <button id="downloadUtilityTuningAdoptionReviewPackButton" type="button">Download Utility Tuning Adoption Review Pack</button>
+    <a href="/api/utility-tuning-adoption-review/summary.txt"><button type="button">Download Utility Tuning Adoption Review TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this after controlled utility adoption is active. It tells you whether to keep the adopted tuned bundle, keep monitoring, or rollback.</p>
+  <div id="utilityTuningAdoptionReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="utilityTuningAdoptionReviewPanel"><p class="muted">No utility tuning adoption review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Historical Decision Lab</h2>
+  <div class="card">
+    <p class="muted">Run one offline suite that replays the current threshold, runs the threshold sweep, and assembles the future-decision memo without touching live scoring.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="historicalDecisionLabAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="historicalDecisionLabHours" type="number" min="1" step="1" value="168" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="historicalDecisionLabStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="historicalDecisionLabMaxScans" type="number" min="1" step="1" value="84" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="historicalDecisionLabMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <div class="control-group">
+        <div class="label">Thresholds</div>
+        <input id="historicalDecisionLabThresholds" type="text" value="0.30,0.35,0.40" />
+      </div>
+      <button id="runHistoricalDecisionLabButton" type="button">Run Historical Decision Lab</button>
+      <button id="loadHistoricalDecisionLabSummaryButton" type="button">Load Historical Decision Lab Summary</button>
+      <button id="downloadHistoricalDecisionLabPackButton" type="button">Download Historical Decision Lab Pack</button>
+    </div>
+    <p class="small muted" style="margin-top:0;">This is offline-only. It replays the current threshold, runs the sweep, and packages the next-decision memo so future causal changes can be challenged before they touch live.</p>
+    <div id="historicalDecisionLabMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="historicalDecisionLabPanel"><p class="muted">No historical decision lab summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Stage 1 Policy Lab</h2>
+  <div class="card">
+    <p class="muted">Offline-only Stage 1 comparison. It replays the same window under looser Stage 1 policies to test whether relaxing Stage 1 improves visible-shortlist utility without touching live.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="stage1PolicyLabAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="stage1PolicyLabHours" type="number" min="1" step="1" value="168" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="stage1PolicyLabStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="stage1PolicyLabMaxScans" type="number" min="1" step="1" value="84" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="stage1PolicyLabMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <button id="runStage1PolicyLabButton" type="button">Run Stage 1 Policy Lab</button>
+      <button id="loadStage1PolicyLabSummaryButton" type="button">Load Stage 1 Policy Lab Summary</button>
+      <button id="downloadStage1PolicyLabPackButton" type="button">Download Stage 1 Policy Lab Pack</button>
+      <a href="/api/reviews/stage1-policy-lab/summary.txt"><button type="button">Download Stage 1 Policy Lab Summary TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">Use this before touching live Stage 1. It compares the current Stage 1 policy against looser offline candidates on a common replay frame and ranks them by visible-shortlist utility.</p>
+    <div id="stage1PolicyLabMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="stage1PolicyLabPanel"><p class="muted">No Stage 1 policy lab summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Next Live Candidate Lab</h2>
+  <div class="card">
+    <p class="muted">Offline-only candidate matrix. It compares model × Stage 1 combinations on the same replay frame and recommends at most one exact next live candidate if it clearly beats the current live baseline.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="nextLiveCandidateLabAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="nextLiveCandidateLabHours" type="number" min="1" step="1" value="168" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="nextLiveCandidateLabStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="nextLiveCandidateLabMaxScans" type="number" min="1" step="1" value="84" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="nextLiveCandidateLabMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <button id="runNextLiveCandidateLabButton" type="button">Run Next Live Candidate Lab</button>
+      <button id="loadNextLiveCandidateLabSummaryButton" type="button">Load Next Live Candidate Lab Summary</button>
+      <button id="downloadNextLiveCandidateLabPackButton" type="button">Download Next Live Candidate Lab Pack</button>
+      <a href="/api/reviews/next-live-candidate-lab/summary.txt"><button type="button">Download Next Live Candidate Lab Summary TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">Run this after Stage 1 Policy Lab and the shadow branch exist. It is the bridge from separate offline labs to one exact live-candidate recommendation.</p>
+    <div id="nextLiveCandidateLabMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="nextLiveCandidateLabPanel"><p class="muted">No next live candidate lab summary loaded yet.</p></div>
+  </div>
+
+
+
+<h2 style="margin-top:24px;">Controlled Live Candidate Proof</h2>
+<div class="card">
+  <p class="muted">Scoped live proof window for one exact next-live candidate only. It applies the candidate’s model and Stage 1 settings for a bounded proof window without making an open-ended live change.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="liveCandidateProofAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <div class="control-group">
+      <div class="label">Proof hours</div>
+      <input id="liveCandidateProofHours" type="number" min="1" step="1" value="24" />
+    </div>
+    <button id="activateLiveCandidateProofButton" type="button">Activate Controlled Live Proof</button>
+    <button id="clearLiveCandidateProofButton" type="button">Clear Controlled Live Proof</button>
+    <button id="loadLiveCandidateProofSummaryButton" type="button">Load Controlled Live Proof Summary</button>
+    <button id="downloadLiveCandidateProofPackButton" type="button">Download Controlled Live Proof Pack</button>
+    <a href="/api/reviews/live-candidate-proof/summary.txt"><button type="button">Download Controlled Live Proof Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the Next Live Candidate Lab supports one exact candidate. It activates a scoped proof window rather than a permanent live change.</p>
+  <div id="liveCandidateProofMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="liveCandidateProofPanel"><p class="muted">No controlled live proof summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Live Proof Review</h2>
+<div class="card">
+  <p class="muted">This isolates matured evidence from the exact controlled live proof session instead of relying on contaminated current-version aggregates.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadLiveCandidateProofReviewSummaryButton" type="button">Load Controlled Live Proof Review</button>
+    <button id="downloadLiveCandidateProofReviewPackButton" type="button">Download Controlled Live Proof Review Pack</button>
+    <a href="/api/reviews/live-candidate-proof-review/summary.txt"><button type="button">Download Controlled Live Proof Review TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this after or during a proof window to see whether the exact candidate’s visible shortlist is actually beating the hidden remainder in isolated live evidence.</p>
+  <div id="liveCandidateProofReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="liveCandidateProofReviewPanel"><p class="muted">No controlled live proof review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Live Candidate Adoption</h2>
+<div class="card">
+  <p class="muted">This is the gated step after isolated live proof. It only allows adoption when the offline winner and the isolated live proof winner still line up, and it preserves a rollback path.</p>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+    <div class="control-group">
+      <div class="label">Admin password</div>
+      <input id="liveCandidateAdoptionAdminPassword" placeholder="Admin password" type="password" />
+    </div>
+    <button id="activateLiveCandidateAdoptionButton" type="button">Activate Controlled Candidate Adoption</button>
+    <button id="clearLiveCandidateAdoptionButton" type="button">Clear Controlled Candidate Adoption</button>
+    <button id="loadLiveCandidateAdoptionSummaryButton" type="button">Load Controlled Candidate Adoption</button>
+    <button id="downloadLiveCandidateAdoptionPackButton" type="button">Download Controlled Candidate Adoption Pack</button>
+    <a href="/api/reviews/live-candidate-adoption/summary.txt"><button type="button">Download Controlled Candidate Adoption TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this only after the isolated proof review supports the candidate. It is the rollback-aware bridge from proof-window success to a real adopted live path.</p>
+  <div id="liveCandidateAdoptionMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="liveCandidateAdoptionPanel"><p class="muted">No controlled live candidate adoption summary loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Controlled Live Candidate Adoption Review</h2>
+<div class="card">
+  <p class="muted">This is the keep-versus-rollback layer for the adopted live path. It isolates matured evidence from the exact adoption session instead of relying on mixed current-version aggregates.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <button id="loadLiveCandidateAdoptionReviewSummaryButton" type="button">Load Adoption Review</button>
+    <button id="downloadLiveCandidateAdoptionReviewPackButton" type="button">Download Adoption Review Pack</button>
+    <a href="/api/utility-tuning-adoption-review/summary.txt"><button type="button">Download Adoption Review TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Use this after controlled adoption is active. It tells you whether to keep the adopted candidate, keep monitoring, or rollback.</p>
+  <div id="liveCandidateAdoptionReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="liveCandidateAdoptionReviewPanel"><p class="muted">No controlled live candidate adoption review loaded yet.</p></div>
+</div>
+
+<h2 style="margin-top:24px;">Fresh Retrain + Symbol Concentration Audit</h2>
+<div class="card">
+  <p class="muted">This is the supported post-falsification branch. It builds a non-promoting shadow retrain candidate and packages the symbol concentration audit without touching the live model.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <input id="freshRetrainAuditAdminPassword" placeholder="Admin password" type="password" />
+    <button id="runFreshRetrainAuditButton" type="button">Run Fresh Retrain Audit</button>
+    <button id="stopFreshRetrainAuditButton" type="button">Stop Fresh Retrain Audit</button>
+    <button id="loadFreshRetrainAuditSummaryButton" type="button">Load Fresh Retrain Audit Summary</button>
+    <button id="downloadFreshRetrainAuditPackButton" type="button">Download Fresh Retrain Audit Pack</button>
+    <a href="/api/reviews/fresh-retrain-audit/summary.txt"><button type="button">Download Fresh Retrain Audit Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">This branch is non-promoting. It builds the shadow candidate and audit pack only. Live promotion remains manual and disallowed.</p>
+  <div id="freshRetrainAuditMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="freshRetrainAuditPanel"><p class="muted">No fresh retrain audit summary loaded yet.</p></div>
+</div>
+
+
+<h2 style="margin-top:24px;">Offline Challenger Comparison</h2>
+<div class="card">
+  <p class="muted">This compares the incumbent live pt2 bundle against the non-promoting shadow retrain candidate on a shared offline evaluation frame. It is offline-only and does not permit live promotion.</p>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <input id="challengerComparisonAdminPassword" placeholder="Admin password" type="password" />
+    <button id="runChallengerComparisonButton" type="button">Run Offline Challenger Comparison</button>
+    <button id="stopChallengerComparisonButton" type="button">Stop Challenger Comparison</button>
+    <button id="loadChallengerComparisonSummaryButton" type="button">Load Challenger Comparison Summary</button>
+    <button id="downloadChallengerComparisonPackButton" type="button">Download Challenger Comparison Pack</button>
+    <a href="/api/reviews/challenger-comparison/summary.txt"><button type="button">Download Challenger Comparison Summary TXT</button></a>
+  </div>
+  <p class="small muted" style="margin-top:0;">Run this only after the fresh retrain audit has completed. The result is a challenger-vs-incumbent offline verdict, not a live promotion.</p>
+  <div id="challengerComparisonMessage" class="muted" style="margin-bottom:10px;"></div>
+  <div id="challengerComparisonPanel"><p class="muted">No challenger comparison summary loaded yet.</p></div>
+</div>
+
+
+  <h2 style="margin-top:24px;">Training</h2>
+  <div class="card">
+    <p>Training builds <strong>pt2</strong> using the current target configuration.</p>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <input id="adminPassword" placeholder="Admin password" type="password" />
+      <button id="trainButton">Start Training</button>
+      <span id="trainMessage" class="muted"></span>
+    </div>
+    <div id="trainingPanel" style="margin-top:12px;"></div>
+  </div>
+
+  <h2 style="margin-top:24px;">Forward Validation</h2>
+  <div class="card"><div id="validationPanel"><p class="muted">Loading…</p></div></div>
+
+  <h2 style="margin-top:24px;">Reliability Lab</h2>
+  <div class="card"><div id="reliabilityPanel"><p class="muted">Loading…</p></div></div>
+
+  <h2 style="margin-top:24px;">Visible Shortlist</h2>
+  <p class="muted">This shortlist can contain action-ready, selective, or watchlist rows. Use the score band and gap-to-validated cues to tell the difference.</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" data-table="actionable" data-sort-key="rank">Rank <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="symbol">Symbol <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="price">Price <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="live_score">Live score <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="decision_score">Decision <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="candidate_stage">Stage <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="probability_semantics">Semantics <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="pre_regime">Pre-regime <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="model_score">Model <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="live_threshold">Threshold <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="market_regime_state">Market regime <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="liquidity_tier">Tier <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="risk">Risk <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="actionable" data-sort-key="reason_summary">Reasons <span class="sort-indicator"></span></th>
+      </tr>
+    </thead>
+    <tbody id="scoreRows"><tr><td colspan="14" class="muted">Loading shortlist…</td></tr></tbody>
+  </table>
+
+
+  <h2 style="margin-top:24px;">Blocked Monitoring Rows <span class="version-tag" id="blockedFocusCount">0</span></h2>
+  <p class="muted">These are the top policy-blocked names by a mix of evidence and closeness to the current live threshold. They are informational only and remain non-tradeable while current live policy constraints apply.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Pre-policy rank</th>
+        <th>Symbol</th>
+        <th>Pre-policy / live</th>
+        <th>Tier</th>
+        <th>Band / validated gap</th>
+        <th>Threshold proximity</th>
+        <th>Suppression</th>
+      </tr>
+    </thead>
+    <tbody id="blockedFocusRows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+  </table>
+
+
+  <h2 style="margin-top:24px;">Cooldown Follow-up Handoff <span class="version-tag" id="followupChangesCount">0</span></h2>
+  <p class="muted">When a blocked run schedules a cooldown follow-up, the app now tracks the top blocked names, rechecks them automatically, and shows whether any became visible or materially improved.</p>
+  <div class="card" id="followupPanel"><p class="muted">Loading…</p></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Symbol</th>
+        <th>Prior blocked state</th>
+        <th>Current state</th>
+        <th>Live delta</th>
+        <th>Outcome</th>
+      </tr>
+    </thead>
+    <tbody id="followupChangesRows"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Informational Rankings (Blocked by Live Policy) <span class="version-tag" id="informationalCount">0</span></h2>
+  <p class="muted">These rows are ranked for information only. They were suppressed by live regime, cooldown, threshold, or display-cap policy and are <strong>not currently actionable</strong>.</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" data-table="informational" data-sort-key="rank">Info Rank <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="symbol">Symbol <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="price">Price <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="live_score">Live score <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="decision_score">Decision <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="candidate_stage">Stage / suppression <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="probability_semantics">Semantics <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="pre_regime">Pre-regime <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="model_score">Model <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="live_threshold">Threshold <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="market_regime_state">Market regime <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="liquidity_tier">Tier <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="risk">Risk <span class="sort-indicator"></span></th>
+        <th class="sortable" data-table="informational" data-sort-key="reason_summary">Reasons <span class="sort-indicator"></span></th>
+      </tr>
+    </thead>
+    <tbody id="informationalScoreRows"><tr><td colspan="14" class="muted">Loading…</td></tr></tbody>
+  </table>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+v4.19.0
+
+- pivots away from another shortlist-policy loop and adds a replay-backed Raw Score Baseline Lab
+- captures every resolved stage-2 rankable replay row before display trimming so raw-model ranking can be judged directly
+- reports raw-model score quantiles, dead-upper-tail verdict, top-1%/5%/10% quality, per-scan top-1/top-3/top-5 quality, base rate, and compression diagnostics
+- adds run/summary/TXT/pack endpoints plus homepage controls for the new baseline pack
+- keeps live path unchanged
