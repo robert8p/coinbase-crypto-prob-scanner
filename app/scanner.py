@@ -450,7 +450,7 @@ class ScannerService:
         }
         return stage1_candidates, meta
 
-    def _build_blocked_monitoring_context(self, *, trigger: str, market_regime, blocked_rows: List[dict], decision_summary: dict) -> dict:
+    def _build_blocked_monitoring_context(self, *, trigger: str, market_regime, blocked_rows: List[dict], decision_summary: dict, effective_market_regime_actionability: str | None = None) -> dict:
         tracked_n = max(1, int(getattr(self.config, "cooldown_followup_track_top_n", 5) or 5))
         blocked_sorted = [dict(r) for r in (blocked_rows or []) if r.get("symbol")]
         blocked_sorted.sort(key=self._blocked_focus_sort_key, reverse=True)
@@ -3714,6 +3714,7 @@ class ScannerService:
             market_regime=market_regime,
             blocked_rows=suppressed_rows,
             decision_summary=decision_summary,
+            effective_market_regime_actionability=effective_market_regime_actionability,
         )
         all_ranked_rows = self._unique_rows_by_symbol(list(scores) + list(suppressed_rows) + list(trimmed_visible_rows))
         threshold_experiment_review = self._build_threshold_experiment_review(

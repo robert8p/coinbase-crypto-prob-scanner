@@ -1427,10 +1427,30 @@ def api_current_version_pack(include_evaluated: bool = Query(default=True)):
     return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
 
 
+def _current_version_model_output_distribution_payload() -> dict:
+    payload = model_output_distribution.latest_summary()
+    if not isinstance(payload, dict):
+        return {
+            "available": False,
+            "app_version": APP_VERSION,
+            "headline": "No model-output distribution summary available",
+        }
+    payload_version = str(payload.get("app_version") or "").strip()
+    if payload_version and payload_version != APP_VERSION:
+        return {
+            "available": False,
+            "app_version": APP_VERSION,
+            "headline": "No model-output distribution summary yet for this deployed version",
+            "summary": "A prior deployment summary is on disk, but it does not belong to the current deployment window.",
+            "stale_prior_app_version": payload_version,
+        }
+    return payload
+
+
 def _build_current_version_summary_payload() -> dict:
     try:
         summary = review_packs.get_current_version_summary()
-        summary["model_output_distribution"] = model_output_distribution.latest_summary()
+        summary["model_output_distribution"] = _current_version_model_output_distribution_payload()
         checkpoint = _decision_rule_checkpoint(summary)
         summary["decision_rule_checkpoint"] = checkpoint
         summary["decision_branch_automation"] = _decision_branch_summary(checkpoint)
@@ -1476,7 +1496,7 @@ def _build_current_version_summary_payload() -> dict:
                 "headline": "No review packs yet for this deployed version",
                 "summary": "Run a scan and wait for review-pack persistence before judging deployment score ranges.",
             },
-            "model_output_distribution": model_output_distribution.latest_summary(),
+            "model_output_distribution": _current_version_model_output_distribution_payload(),
             "decision_rule_checkpoint": _decision_rule_checkpoint({"evidence": {"visible_rows": 0, "visible_quality_hit_rate": None, "non_visible_quality_hit_rate": None}}),
             "decision_branch_automation": _decision_branch_summary(_decision_rule_checkpoint({"evidence": {"visible_rows": 0, "visible_quality_hit_rate": None, "non_visible_quality_hit_rate": None}})),
         }

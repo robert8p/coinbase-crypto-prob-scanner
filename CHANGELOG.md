@@ -1,3 +1,8 @@
+## 4.20.3 - 2026-04-15
+- Fixed a scan-failing NameError in blocked monitoring context wiring introduced in 4.20.2.
+- Threaded effective regime actionability into blocked monitoring context generation.
+- Suppressed stale prior-version model-output distribution payloads from current-version summary endpoints.
+
 
 ## v4.20.2
 - Fixed raw-threshold effective regime actionability propagation into row assessment and summaries.

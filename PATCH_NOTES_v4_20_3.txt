@@ -1,0 +1,16 @@
+Coinbase Crypto Prob Scanner v4.20.3
+
+Hotfix tranche.
+
+What changed
+- Fixed the 4.20.2 scan crash caused by _build_blocked_monitoring_context referencing
+  effective_market_regime_actionability without accepting it as an argument.
+- Threaded the effective regime actionability value into blocked-monitoring context creation.
+- Prevented /api/reviews/current-version-summary from surfacing stale model-output
+  distribution payloads from a prior app version as though they belonged to the current deployment.
+
+What did not change
+- Live selection engine remains legacy.
+- Stage 1 remains stage1_opportunity_model.
+- Live raw threshold remains 0.35.
+- Model bundle remains unchanged.
