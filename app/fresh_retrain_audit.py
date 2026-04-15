@@ -215,6 +215,29 @@ class FreshRetrainAuditService:
         value = scope.get('state_scope_key') if isinstance(scope, dict) else None
         return str(value) if value not in (None, '') else None
 
+    def _current_deployed_since(self) -> str | None:
+        scope = current_runtime_scope(self.config.model_dir, app_version=APP_VERSION)
+        value = scope.get('deployed_since_utc') if isinstance(scope, dict) else None
+        return str(value) if value not in (None, '') else None
+
+    def _parse_utc(self, value: Any) -> datetime | None:
+        raw = str(value or '').strip()
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        except Exception:
+            return None
+
+    def _lineage_prefix(self, version: str | None) -> str:
+        raw = str(version or '').strip()
+        if not raw:
+            return ''
+        parts = raw.split('.')
+        if len(parts) >= 2:
+            return '.'.join(parts[:2])
+        return raw
+
     def _summary_matches_current_scope(self, summary: dict | None) -> bool:
         checkpoint = self._summary_checkpoint(summary)
         state_scope_key = checkpoint.get('state_scope_key')
@@ -239,30 +262,42 @@ class FreshRetrainAuditService:
         try:
             with self.review_packs._connect() as conn:  # internal app service use
                 rows = conn.execute(
-                    "SELECT app_version, MAX(scan_finished_utc) AS latest_finished_utc FROM review_runs WHERE app_version = ? GROUP BY app_version ORDER BY latest_finished_utc DESC LIMIT 3",
-                    (APP_VERSION,),
+                    "SELECT app_version, MAX(scan_finished_utc) AS latest_finished_utc FROM review_runs GROUP BY app_version ORDER BY latest_finished_utc DESC LIMIT 25"
                 ).fetchall()
         except Exception as exc:
             logger.warning('fresh_retrain_audit_discovery_failed error=%s', exc)
             return None, {'origin': 'review_runs_discovery_failed', 'reason': str(exc)}
 
+        current_lineage = self._lineage_prefix(APP_VERSION)
+        current_deployed_at = self._parse_utc(self._current_deployed_since())
         for row in rows:
-            version = str(row['app_version'] or '')
-            if not version or version != APP_VERSION:
+            version = str(row['app_version'] or '').strip()
+            if not version or version == APP_VERSION:
+                continue
+            if self._lineage_prefix(version) != current_lineage:
+                continue
+            latest_finished = self._parse_utc(row['latest_finished_utc'])
+            if current_deployed_at is not None and latest_finished is not None and latest_finished >= current_deployed_at:
                 continue
             try:
                 candidate = self.review_packs.get_current_version_summary(app_version=version) or {}
             except Exception:
                 continue
-            if self._summary_is_falsified(candidate) or (self._summary_branch_outcome(candidate) == 'falsified'):
-                checkpoint = self._summary_checkpoint(candidate)
-                return candidate, {
-                    'origin': 'review_runs_current_app_latest_falsified',
-                    'source_app_version': version,
-                    'source_generated_at_utc': candidate.get('generated_at_utc'),
-                    'source_state_scope_key': checkpoint.get('state_scope_key'),
-                }
-        return None, {'origin': 'no_current_app_falsified_summary_found', 'source_app_version': APP_VERSION}
+            if not (self._summary_is_falsified(candidate) or (self._summary_branch_outcome(candidate) == 'falsified')):
+                continue
+            checkpoint = self._summary_checkpoint(candidate)
+            return candidate, {
+                'origin': 'review_runs_latest_prior_lineage_falsified',
+                'source_app_version': version,
+                'source_generated_at_utc': candidate.get('generated_at_utc'),
+                'source_state_scope_key': checkpoint.get('state_scope_key'),
+                'source_checkpoint_resolution': 'latest_prior_lineage_summary',
+            }
+        return None, {
+            'origin': 'no_prior_lineage_falsified_summary_found',
+            'source_app_version': APP_VERSION,
+            'lineage_prefix': current_lineage,
+        }
 
     def _resolve_source_summary(self, current_version: dict) -> tuple[dict, dict]:
         if self._summary_is_falsified(current_version) or (self._summary_branch_outcome(current_version) == 'falsified'):
@@ -292,7 +327,7 @@ class FreshRetrainAuditService:
             meta.setdefault('source_checkpoint_resolution', 'discovered_current_app_summary')
             return discovered_summary, meta
 
-        raise RuntimeError('No current-deployment falsified source checkpoint could be resolved for the fresh retrain audit branch.')
+        raise RuntimeError('No eligible falsified source checkpoint could be resolved for the fresh retrain audit branch.')
 
     def _persist_source_context(self, *, source_summary: dict, source_context: dict) -> None:
         payload = {
