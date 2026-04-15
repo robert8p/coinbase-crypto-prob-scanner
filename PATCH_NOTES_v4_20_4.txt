@@ -1,0 +1,16 @@
+Coinbase Crypto Prob Scanner v4.20.4
+
+Operator-truth hotfix tranche for the fresh retrain audit branch.
+
+What changed
+- Fresh retrain audit now resolves falsified source context only from the current deployment/app scope rather than falling back to stale historical 4.11.x summaries.
+- Fresh retrain audit now treats a falsified decision-branch checkpoint as sufficient source evidence, even if the current-version summary race is imperfect.
+- Fresh retrain audit clears stale latest artifacts at run start so a failed run cannot reuse or masquerade as an old shadow candidate summary/pack.
+- Fresh retrain audit download endpoint now suppresses stale latest-pack exposure unless the latest run actually completed for the current app version.
+- Failed audit summaries are now written from a clean failure payload instead of inheriting stale fields from a prior completed run.
+
+What did not change
+- Live selection engine remains legacy.
+- Stage 1 remains stage1_opportunity_model.
+- Live raw threshold remains 0.35.
+- Live model bundle remains unchanged.

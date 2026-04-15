@@ -873,3 +873,9 @@ Implements findings from the v2.5.0 technical review. Three fundamental changes.
 ## v4.15.3
 - Reverted LIVE_SELECTION_MODE default to legacy in config and render.yaml.
 - Kept Utility Policy Search as the challenger discovery path while protecting live with the incumbent legacy shortlist.
+
+
+## v4.20.4
+- Fix fresh retrain audit source-resolution so it only binds to the current deployment falsification scope.
+- Clear stale audit artifacts at run start and prevent failed runs from surfacing old shadow candidate payloads as current truth.
+- Gate latest-pack download on a genuinely completed current-version audit run.

@@ -92,7 +92,14 @@ class FreshRetrainAuditService:
         return self._repair_stale_summary(summary)
 
     def latest_pack(self) -> Path | None:
-        return self.pack_path if self.pack_path.exists() else None
+        summary = self.latest_summary()
+        if not self.pack_path.exists():
+            return None
+        if str(summary.get('status') or '').lower() != 'completed':
+            return None
+        if str(summary.get('app_version') or APP_VERSION) != APP_VERSION:
+            return None
+        return self.pack_path
 
     def start_run(self) -> dict:
         if self._lock.locked():
@@ -194,12 +201,46 @@ class FreshRetrainAuditService:
     def _summary_is_falsified(self, summary: dict | None) -> bool:
         return self._summary_outcome(summary) == 'falsified'
 
+    def _summary_branch_outcome(self, summary: dict | None) -> str | None:
+        summary = dict(summary or {})
+        branch = dict(summary.get('decision_branch_automation') or {})
+        outcome = branch.get('checkpoint_outcome')
+        if outcome in (None, ''):
+            checkpoint = self._summary_checkpoint(summary)
+            outcome = checkpoint.get('current_outcome') or checkpoint.get('decision_checkpoint_outcome')
+        return str(outcome) if outcome not in (None, '') else None
+
+    def _current_scope_key(self) -> str | None:
+        scope = current_runtime_scope(self.config.model_dir, app_version=APP_VERSION)
+        value = scope.get('state_scope_key') if isinstance(scope, dict) else None
+        return str(value) if value not in (None, '') else None
+
+    def _summary_matches_current_scope(self, summary: dict | None) -> bool:
+        checkpoint = self._summary_checkpoint(summary)
+        state_scope_key = checkpoint.get('state_scope_key')
+        current_scope_key = self._current_scope_key()
+        return bool(current_scope_key and state_scope_key and str(state_scope_key) == str(current_scope_key))
+
+    def _clear_latest_artifacts(self) -> None:
+        for path in [
+            self.summary_path,
+            self.pack_path,
+            self.shadow_model_path,
+            self.incumbent_model_copy_path,
+        ]:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                logger.warning('fresh_retrain_audit_cleanup_failed path=%s', path)
+
     def _discover_latest_falsified_summary(self) -> tuple[dict | None, dict]:
         rows = []
         try:
             with self.review_packs._connect() as conn:  # internal app service use
                 rows = conn.execute(
-                    "SELECT app_version, MAX(scan_finished_utc) AS latest_finished_utc FROM review_runs GROUP BY app_version ORDER BY latest_finished_utc DESC LIMIT 12"
+                    "SELECT app_version, MAX(scan_finished_utc) AS latest_finished_utc FROM review_runs WHERE app_version = ? GROUP BY app_version ORDER BY latest_finished_utc DESC LIMIT 3",
+                    (APP_VERSION,),
                 ).fetchall()
         except Exception as exc:
             logger.warning('fresh_retrain_audit_discovery_failed error=%s', exc)
@@ -207,44 +248,51 @@ class FreshRetrainAuditService:
 
         for row in rows:
             version = str(row['app_version'] or '')
-            if not version:
+            if not version or version != APP_VERSION:
                 continue
             try:
                 candidate = self.review_packs.get_current_version_summary(app_version=version) or {}
             except Exception:
                 continue
-            if self._summary_is_falsified(candidate):
+            if self._summary_is_falsified(candidate) or (self._summary_branch_outcome(candidate) == 'falsified'):
                 checkpoint = self._summary_checkpoint(candidate)
                 return candidate, {
-                    'origin': 'review_runs_latest_falsified',
+                    'origin': 'review_runs_current_app_latest_falsified',
                     'source_app_version': version,
                     'source_generated_at_utc': candidate.get('generated_at_utc'),
                     'source_state_scope_key': checkpoint.get('state_scope_key'),
                 }
-        return None, {'origin': 'no_falsified_summary_found'}
+        return None, {'origin': 'no_current_app_falsified_summary_found', 'source_app_version': APP_VERSION}
 
     def _resolve_source_summary(self, current_version: dict) -> tuple[dict, dict]:
-        if self._summary_is_falsified(current_version):
+        if self._summary_is_falsified(current_version) or (self._summary_branch_outcome(current_version) == 'falsified'):
             checkpoint = self._summary_checkpoint(current_version)
             return current_version, {
                 'origin': 'current_version_scope',
                 'source_app_version': current_version.get('app_version') or APP_VERSION,
                 'source_generated_at_utc': current_version.get('generated_at_utc'),
                 'source_state_scope_key': checkpoint.get('state_scope_key'),
+                'source_checkpoint_resolution': 'current_version_summary',
             }
 
         cached = read_json(self.source_context_path, {})
         cached_summary = dict(cached.get('source_current_version_summary') or {}) if isinstance(cached, dict) else {}
-        if self._summary_is_falsified(cached_summary):
-            meta = dict(cached.get('source_context') or {})
-            meta.setdefault('origin', 'cached_source_context')
-            return cached_summary, meta
+        cached_meta = dict(cached.get('source_context') or {}) if isinstance(cached, dict) else {}
+        if (
+            cached_meta.get('source_app_version') == APP_VERSION
+            and self._summary_matches_current_scope(cached_summary)
+            and (self._summary_is_falsified(cached_summary) or (self._summary_branch_outcome(cached_summary) == 'falsified'))
+        ):
+            cached_meta.setdefault('origin', 'cached_current_scope_source_context')
+            cached_meta.setdefault('source_checkpoint_resolution', 'cached_current_scope_summary')
+            return cached_summary, cached_meta
 
         discovered_summary, meta = self._discover_latest_falsified_summary()
         if discovered_summary:
+            meta.setdefault('source_checkpoint_resolution', 'discovered_current_app_summary')
             return discovered_summary, meta
 
-        raise RuntimeError('No falsified source checkpoint could be resolved for the fresh retrain audit branch.')
+        raise RuntimeError('No current-deployment falsified source checkpoint could be resolved for the fresh retrain audit branch.')
 
     def _persist_source_context(self, *, source_summary: dict, source_context: dict) -> None:
         payload = {
@@ -344,7 +392,10 @@ class FreshRetrainAuditService:
     def _run(self) -> None:
         if not self._lock.acquire(blocking=False):
             return
+        current_version: dict = {}
+        source_context: dict = {}
         try:
+            self._clear_latest_artifacts()
             current_version = self.review_packs.get_current_version_summary() or {}
             source_summary, source_context = self._resolve_source_summary(current_version)
             self._raise_if_cancel_requested()
@@ -353,49 +404,64 @@ class FreshRetrainAuditService:
             summary = self._build_summary(current_version=current_version, source_summary=source_summary, source_context=source_context)
             atomic_write_json(self.summary_path, summary)
         except AuditCancelledError as exc:
-            cancelled = self.latest_summary()
-            cancelled.update({
+            cancelled = {
                 'available': True,
                 'running': False,
                 'status': 'cancelled',
                 'generated_at_utc': _utc_now_iso(),
                 'finished_at_utc': _utc_now_iso(),
+                'app_version': APP_VERSION,
                 'headline': 'Fresh retrain audit cancelled',
                 'summary': str(exc),
                 'error': None,
                 'stop_requested': True,
+                'source_context': dict(source_context or {}),
                 'progress': {
                     'stage': 'cancelled',
                     'detail': str(exc),
                     'fraction': 1.0,
-                    'completed_symbols': int(((cancelled.get('progress') or {}).get('completed_symbols')) or 0),
-                    'total_symbols': int(((cancelled.get('progress') or {}).get('total_symbols')) or 0),
+                    'completed_symbols': 0,
+                    'total_symbols': 0,
                     'current_symbol': None,
                 },
-            })
+            }
             atomic_write_json(self.summary_path, cancelled)
         except Exception as exc:
             logger.exception('fresh_retrain_audit_failed error=%s', exc)
-            failed = self.latest_summary()
-            failed.update({
+            checkpoint = self._summary_checkpoint(current_version)
+            evidence = self._summary_evidence(current_version)
+            failed = {
                 'available': True,
                 'running': False,
                 'status': 'failed',
                 'generated_at_utc': _utc_now_iso(),
                 'finished_at_utc': _utc_now_iso(),
+                'app_version': APP_VERSION,
+                'state_scope_key': self._current_scope_key() or checkpoint.get('state_scope_key'),
                 'headline': 'Fresh retrain audit failed',
                 'summary': f'{type(exc).__name__}: {exc}',
                 'error': f'{type(exc).__name__}: {exc}',
                 'stop_requested': bool(self._stop_event.is_set()),
+                'source_context': dict(source_context or {}),
+                'current_live_path': self._live_path_snapshot(checkpoint=checkpoint, evidence=evidence) if current_version else {},
                 'progress': {
                     'stage': 'failed',
                     'detail': f'{type(exc).__name__}: {exc}',
                     'fraction': 1.0,
-                    'completed_symbols': int(((failed.get('progress') or {}).get('completed_symbols')) or 0),
-                    'total_symbols': int(((failed.get('progress') or {}).get('total_symbols')) or 0),
+                    'completed_symbols': 0,
+                    'total_symbols': 0,
                     'current_symbol': None,
                 },
-            })
+                'artifact_paths': {
+                    'shadow_model_path': str(self.shadow_model_path),
+                    'incumbent_model_path': str(self.incumbent_model_copy_path),
+                    'pack_path': str(self.pack_path),
+                },
+                'notes': [
+                    'This run did not produce a valid new shadow candidate summary.',
+                    'Stale latest artifacts are cleared at run start so a failed run cannot masquerade as a current result.',
+                ],
+            }
             atomic_write_json(self.summary_path, failed)
         finally:
             self._stop_event.clear()
