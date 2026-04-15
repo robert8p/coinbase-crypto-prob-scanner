@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .persist import atomic_write_json, ensure_dir, read_json
+from .objective_semantics import load_objective_semantics_contract
 from .version import APP_VERSION
 
 
@@ -150,7 +151,14 @@ class ModelOutputDistributionService:
                 rows.append(payload)
         return rows
 
-    def _headline(self, avg_ge_045: float) -> str:
+    def _headline(self, avg_ge_045: float, *, objective_contract: dict | None = None) -> str:
+        objective_contract = dict(objective_contract or {})
+        if objective_contract.get("available"):
+            if avg_ge_045 >= 2.0:
+                return "Model is producing useful upper-tail density"
+            if avg_ge_045 >= 0.5:
+                return "Upper tail still appears intermittently in live scans, but replay-backed baseline says ranking is usable and semantics remain the leading blocker"
+            return "Live upper tail is sparse in this window, but replay-backed baseline says ranking is usable; semantics remain the leading blocker"
         if avg_ge_045 >= 2.0:
             return "Model is producing useful upper-tail density"
         if avg_ge_045 >= 0.5:
@@ -184,6 +192,11 @@ class ModelOutputDistributionService:
         for snapshot in snapshots:
             regime = str(snapshot.get("market_regime_state") or "unknown")
             regime_distribution[regime] = regime_distribution.get(regime, 0) + 1
+        objective_contract = load_objective_semantics_contract(
+            self.config.model_dir,
+            live_threshold=float(getattr(self.config, "live_raw_threshold", 0.0) or 0.0),
+            stage1_selection_mode=str(getattr(self.config, "stage1_selection_mode", "") or ""),
+        )
         summary = {
             "available": True,
             "app_version": APP_VERSION,
@@ -212,7 +225,8 @@ class ModelOutputDistributionService:
             ),
             "max_score_seen_in_window": round(max(maxes), 6) if maxes else None,
             "regime_distribution": regime_distribution,
-            "headline": self._headline(avg_ge_045),
+            "headline": self._headline(avg_ge_045, objective_contract=objective_contract),
+            "objective_semantics_contract": objective_contract if isinstance(objective_contract, dict) else {},
             "latest_snapshot": snapshots[-1],
         }
         return summary

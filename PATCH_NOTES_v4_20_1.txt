@@ -1,0 +1,13 @@
+Coinbase Crypto Prob Scanner v4.20.1
+
+Fixes objective-semantics wiring regression from v4.20.0.
+
+What changed
+- Objective semantics are now attached to every scored row via scanner._score_band(), so visible, suppressed, blocked, replay, and review-pack rows populate:
+  objective_score_band
+  objective_score_band_label
+  objective_quality_reference_rate
+  objective distance/floor fields
+- Decision summaries now mention confirmed/strong/priority/elite edge counts even when validated-band rows are also present.
+- Model output distribution headlines are now aware of the replay-backed raw-score-baseline contract, avoiding the misleading default claim that Stage 2 compression is the leading hypothesis when the baseline already says semantics are the blocker.
+- Live selection logic remains unchanged. Threshold remains 0.35.

@@ -990,7 +990,13 @@ class ScannerService:
             band = "exploratory"
             label = "Exploratory only"
             priority = "exploratory_only"
-        return {
+        objective_contract = self._objective_semantics_contract()
+        objective_band = score_objective_band(
+            live_score=score,
+            contract=objective_contract,
+            near_gap=float(getattr(self.config, "stage2_blocked_near_threshold_gap", 0.08) or 0.08),
+        )
+        payload = {
             "validated_floor": round(validated_floor, 4),
             "near_validated_floor": round(near_floor, 4),
             "distance_to_validated": round(gap, 4),
@@ -999,6 +1005,8 @@ class ScannerService:
             "score_band_label": label,
             "monitor_priority": priority,
         }
+        payload.update(dict(objective_band or {}))
+        return payload
 
     def _visibility_band(self, *, live_score: float, live_threshold: float) -> dict:
         threshold = max(0.0, float(live_threshold or 0.0))
@@ -1977,6 +1985,17 @@ class ScannerService:
                 f"but they remain advisory-only: {selective_count} selective and {watchlist_count} watchlist. "
                 f"Treat them as validated-band monitoring rows, not direct action signals."
             )
+            if objective_confirmed_rows and confirmed_floor is not None:
+                summary += (
+                    f" {len(objective_confirmed_rows)} visible row{'s' if len(objective_confirmed_rows) != 1 else ''} also cleared the confirmed shortlist floor "
+                    f"({float(confirmed_floor):.2f}+)."
+                )
+                if strong_floor is not None:
+                    summary += f" {len(strong_edge_rows)} reached the strong edge band ({float(strong_floor):.2f}+)."
+                if priority_floor is not None:
+                    summary += f" {len(priority_edge_rows)} reached the priority edge band ({float(priority_floor):.2f}+)."
+                if elite_edge_rows:
+                    summary += f" {len(elite_edge_rows)} reached the elite edge band."
             if hidden_watchlist_rows > 0:
                 summary += f" {hidden_watchlist_rows} lower-priority watchlist rows were hidden from the visible shortlist and preserved in the review pack."
         elif selective:
