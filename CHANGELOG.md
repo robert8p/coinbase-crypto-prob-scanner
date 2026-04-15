@@ -1,3 +1,11 @@
+# Changelog
+
+## v4.20.6
+- Added control-ledger automation endpoints: `/api/control-ledger/facts`, `/api/control-ledger/facts.txt`, `/api/control-ledger/release-manifest`, `/api/control-ledger/release-manifest.txt`, and `/api/control-ledger/ledger-input-pack.zip`.
+- Added a generated factual Control Ledger export and downloadable ledger-input pack so the four-chat operating system can ingest a clean factual base without auto-writing strategic judgment.
+- Surfaced control-ledger downloads in `/health`, `/api/status`, `/api/reviews/current-version-summary`, and on the homepage operator-share buttons.
+- Added repo-root `release_manifest.json` to carry tranche-level release metadata for the build/review/governor loop.
+
 ## 4.20.3 - 2026-04-15
 - Fixed a scan-failing NameError in blocked monitoring context wiring introduced in 4.20.2.
 - Threaded effective regime actionability into blocked monitoring context generation.

@@ -1,0 +1,25 @@
+Coinbase Crypto Prob Scanner v4.20.6
+
+What changed
+- Added automated Control Ledger factual exports.
+- Added a downloadable ledger-input pack for the four-chat workflow.
+- Added a release manifest endpoint and homepage buttons for the new operator outputs.
+
+New endpoints
+- GET /api/control-ledger/facts
+- GET /api/control-ledger/facts.txt
+- GET /api/control-ledger/release-manifest
+- GET /api/control-ledger/release-manifest.txt
+- GET /api/control-ledger/ledger-input-pack.zip
+
+Why
+- Automate the factual parts of the Control Ledger.
+- Keep strategic judgment in Chat B / Chat C rather than hard-coding it in-app.
+- Reduce manual packaging work when moving between Review -> Governor -> Build.
+
+Post-deploy operator checks
+1. Open /health and confirm version 4.20.6.
+2. Open the homepage and confirm the new Control-Ledger buttons are visible.
+3. Download /api/control-ledger/ledger-input-pack.zip.
+4. Confirm the ZIP contains control_ledger_facts.json, control_ledger_facts.txt, release_manifest.json, api_status_snapshot.json, health_snapshot.json, current_version_summary.json, automation_status.json, and model_output_distribution.json.
+5. Feed that ZIP plus the shared Control Ledger into Chat B for the next review cycle.

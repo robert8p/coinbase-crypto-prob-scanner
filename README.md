@@ -1,6 +1,6 @@
-# Coinbase Crypto Prob Scanner v4.10.0
+# Coinbase Crypto Prob Scanner v4.20.6
 
-A FastAPI decision-support scanner for Coinbase-tradeable crypto. It identifies names with the strongest evidence of achieving a **quality +2.0% move within 240 minutes**, applies live-policy controls for regime stress, cooldowns, and actionability, then persists evidence packs for honest post-hoc review.
+A FastAPI decision-support scanner for Coinbase-tradeable crypto. It identifies names with the strongest evidence of achieving a **quality +2.0% move within 240 minutes**, applies live-policy controls for regime stress, cooldowns, and actionability, then persists evidence packs for honest post-hoc review. It also exposes an automated Control Ledger factual export and ledger-input pack so a separate review/governor/build chat system can ingest current app truth without guessing.
 
 **This is a research/advisory scanner, not a trade execution system.** It produces a shortlist of candidates for human review. It does not place orders.
 
@@ -162,6 +162,10 @@ See `.env.example` for the complete list with defaults.
 | `/api/paper-trade/summary` | GET | Forward-validation summary |
 | `/api/reviews/runs` | GET | Recent review pack runs |
 | `/api/reviews/current-version-summary` | GET | Deployment-window evidence summary |
+| `/api/control-ledger/facts` | GET | Auto-generated factual Control Ledger JSON |
+| `/api/control-ledger/facts.txt` | GET | Auto-generated factual Control Ledger TXT |
+| `/api/control-ledger/release-manifest` | GET | Current tranche/release manifest JSON |
+| `/api/control-ledger/ledger-input-pack.zip` | GET | Packaged factual inputs for the four-chat workflow |
 | `/api/reviews/post-maturity-bundle.zip` | GET | Latest automated post-maturity evidence bundle |
 | `/api/reviews/diagnostic-battery` | GET | Latest automated diagnostic verdict JSON |
 | `/api/reviews/diagnostic-battery.txt` | GET | Latest automated diagnostic verdict TXT |
@@ -186,6 +190,8 @@ DEMO_MODE=true python -m uvicorn app.main:app --port 8000
 # Live mode
 DEMO_MODE=false MODEL_DIR=/var/data/model python -m uvicorn app.main:app --port 8000
 ```
+
+After startup, the factual Control Ledger exports are available at `/api/control-ledger/facts`, `/api/control-ledger/facts.txt`, and `/api/control-ledger/ledger-input-pack.zip`.
 
 ## Docker
 

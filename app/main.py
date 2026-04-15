@@ -66,6 +66,7 @@ from .training import TrainingService
 from .evidence_automation import EvidenceAutomationService
 from .model_output_distribution import ModelOutputDistributionService
 from .utility_operator_automation import UtilityOperatorAutomationService
+from .control_ledger import ControlLedgerService
 from .version import APP_VERSION
 from .runtime_scope import initialize_runtime_scope
 
@@ -146,7 +147,12 @@ utility_operator_automation = UtilityOperatorAutomationService(
     utility_tuning_adoption,
     utility_tuning_adoption_review,
 )
-
+control_ledger = ControlLedgerService(
+    config,
+    app_version=APP_VERSION,
+    app_name="Coinbase Crypto Prob Scanner",
+    objective="Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
+)
 
 
 def _dict_to_text(payload: dict) -> str:
@@ -458,6 +464,7 @@ def health():
             "quality_max_mae": config.quality_max_mae,
             "quality_min_end_ret": config.quality_min_end_ret,
         },
+        "control_ledger": control_ledger.build_download_summary(),
     }
 
 
@@ -498,6 +505,7 @@ def _build_status_snapshot(*, reason: str = "api_status") -> dict:
         "trained_cohort_size": int(pt2.get("trained_cohort_size", 0) or 0),
         "trained_cohort_hash": pt2.get("trained_cohort_hash"),
     }
+    status["control_ledger"] = control_ledger.build_download_summary()
     return _public_status_payload(status)
 
 
@@ -548,6 +556,7 @@ def health_txt():
             "quality_max_mae": config.quality_max_mae,
             "quality_min_end_ret": config.quality_min_end_ret,
         },
+        "control_ledger": control_ledger.build_download_summary(),
     }
     filename = f"health_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%z')}.txt"
     return PlainTextResponse(
@@ -1454,6 +1463,7 @@ def _build_current_version_summary_payload() -> dict:
         checkpoint = _decision_rule_checkpoint(summary)
         summary["decision_rule_checkpoint"] = checkpoint
         summary["decision_branch_automation"] = _decision_branch_summary(checkpoint)
+        summary["control_ledger"] = control_ledger.build_download_summary()
         return summary
     except FileNotFoundError:
         return {
@@ -1499,6 +1509,7 @@ def _build_current_version_summary_payload() -> dict:
             "model_output_distribution": _current_version_model_output_distribution_payload(),
             "decision_rule_checkpoint": _decision_rule_checkpoint({"evidence": {"visible_rows": 0, "visible_quality_hit_rate": None, "non_visible_quality_hit_rate": None}}),
             "decision_branch_automation": _decision_branch_summary(_decision_rule_checkpoint({"evidence": {"visible_rows": 0, "visible_quality_hit_rate": None, "non_visible_quality_hit_rate": None}})),
+            "control_ledger": control_ledger.build_download_summary(),
         }
 
 
@@ -1518,6 +1529,64 @@ def api_current_version_summary_txt():
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
+
+
+@app.get("/api/control-ledger/release-manifest")
+def api_control_ledger_release_manifest():
+    return control_ledger.build_release_manifest()
+
+
+@app.get("/api/control-ledger/release-manifest.txt")
+def api_control_ledger_release_manifest_txt():
+    manifest = control_ledger.build_release_manifest()
+    generated = ((manifest.get("generated_at_utc") or manifest.get("app_version") or "latest").replace(":", "-"))
+    filename = f"control_ledger_release_manifest_{generated}.txt"
+    return FileResponse(str(control_ledger.release_manifest_txt_path), media_type="text/plain", filename=filename)
+
+
+def _control_ledger_facts_payload() -> dict:
+    status_snapshot = _build_status_snapshot(reason="control_ledger_facts")
+    health_snapshot = health()
+    current_version_summary = _build_current_version_summary_payload()
+    automation_status = evidence_automation.latest_status() or evidence_automation.refresh(reason="control_ledger_facts", event_type="manual_refresh")
+    model_distribution = _current_version_model_output_distribution_payload()
+    return control_ledger.build_facts_payload(
+        status_snapshot=status_snapshot,
+        health_snapshot=health_snapshot,
+        current_version_summary=current_version_summary,
+        automation_status=automation_status,
+        model_output_distribution=model_distribution,
+    )
+
+
+@app.get("/api/control-ledger/facts")
+def api_control_ledger_facts():
+    return _control_ledger_facts_payload()
+
+
+@app.get("/api/control-ledger/facts.txt")
+def api_control_ledger_facts_txt():
+    payload = _control_ledger_facts_payload()
+    generated = ((payload.get("generated_at_utc") or payload.get("app_identity", {}).get("app_version") or "latest").replace(":", "-"))
+    filename = f"control_ledger_facts_{generated}.txt"
+    return FileResponse(str(control_ledger.facts_txt_path), media_type="text/plain", filename=filename)
+
+
+@app.get("/api/control-ledger/ledger-input-pack.zip")
+def api_control_ledger_input_pack():
+    status_snapshot = _build_status_snapshot(reason="control_ledger_pack")
+    health_snapshot = health()
+    current_version_summary = _build_current_version_summary_payload()
+    automation_status = evidence_automation.latest_status() or evidence_automation.refresh(reason="control_ledger_pack", event_type="manual_refresh")
+    model_distribution = _current_version_model_output_distribution_payload()
+    pack = control_ledger.build_input_pack(
+        status_snapshot=status_snapshot,
+        health_snapshot=health_snapshot,
+        current_version_summary=current_version_summary,
+        automation_status=automation_status,
+        model_output_distribution=model_distribution,
+    )
+    return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
 
 
 
