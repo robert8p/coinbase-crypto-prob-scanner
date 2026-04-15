@@ -3452,6 +3452,7 @@ function renderCurrentVersionSummary(summary) {
   const range = evidence.score_range || {};
   const decisionRule = summary.decision_checkpoint || summary.decision_rule_checkpoint || {};
   const decisionBranch = summary.decision_branch_automation || {};
+  const decisionSummary = summary.decision_summary || {};
   const regimeRows = (summary.regime_breakdown || []).map(function(row) {
     return '<tr><td>' + (row.market_regime_state || '-') + '</td><td>' + (row.market_regime_actionability || '-') + '</td><td>' + (row.run_count || 0) + '</td><td>' + (row.evaluated_run_count || 0) + '</td><td>' + (row.visible_rows || 0) + '</td><td>' + (row.suppressed_rows || 0) + '</td></tr>';
   }).join('');
@@ -3500,6 +3501,14 @@ function renderCurrentVersionSummary(summary) {
         '<p><strong>Threshold q-hits:</strong> ' + (evidence.threshold_quality_hits || 0) + '</p>' +
         '<p><strong>Validated bands dormant:</strong> ' + (evidence.validated_bands_dormant ? 'true' : 'false') + '</p>' +
         '<p class="small"><strong>Regime semantics:</strong> ' + (summary.regime_semantics_note || 'Regime labels are being applied directly as stored.') + '</p>' +
+      '</div>' +
+      '<div class="card"><h3>Objective decision support</h3>' +
+        '<p><strong>Headline:</strong> ' + (decisionSummary.headline || '-') + '</p>' +
+        '<p><strong>Confirmed shortlist:</strong> ' + (decisionSummary.objective_confirmed_rows || 0) + '</p>' +
+        '<p><strong>Strong / priority / elite:</strong> ' + (decisionSummary.strong_edge_rows || 0) + ' / ' + (decisionSummary.priority_edge_rows || 0) + ' / ' + (decisionSummary.elite_edge_rows || 0) + '</p>' +
+        '<p><strong>Blocked near threshold:</strong> ' + (decisionSummary.blocked_near_threshold_rows || 0) + '</p>' +
+        '<p><strong>Effective regime actionability:</strong> ' + (decisionSummary.market_regime_actionability || '-') + '</p>' +
+        '<p class="small"><strong>Summary:</strong> ' + (decisionSummary.summary || '-') + '</p>' +
       '</div>' +
       '<div class="card"><h3>Decision checkpoint</h3>' +
         '<p><strong>Stage1 mode:</strong> ' + (decisionRule.stage1_selection_mode || '-') + '</p>' +

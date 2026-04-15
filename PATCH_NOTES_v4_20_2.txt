@@ -1,0 +1,13 @@
+Coinbase Crypto Prob Scanner v4.20.2
+
+What changed
+- Fixed raw-threshold actionability propagation so effective regime actionability is used in operator-facing actionability assessment and decision summaries.
+- Amber/cooldown advisory states in raw-threshold mode no longer masquerade as hard actionability constraints in summary labels.
+- Promoted objective decision-support visibility in the current-version UI with a dedicated card for confirmed/strong/priority/elite edge counts and summary.
+- Improved decision-summary headlines to lead with confirmed-shortlist / elite-edge information when present, rather than defaulting to the old validated-tail headline.
+
+What did not change
+- Live selection engine remains legacy.
+- Stage 1 remains stage1_opportunity_model.
+- Live raw threshold remains 0.35.
+- No threshold, Stage 1, model, or guardrail logic changed.

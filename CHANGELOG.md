@@ -1,3 +1,9 @@
+
+## v4.20.2
+- Fixed raw-threshold effective regime actionability propagation into row assessment and summaries.
+- Added objective decision-support card to the current-version UI.
+- Updated decision-summary headlines to foreground confirmed/strong/priority/elite objective bands when present.
+
 ## v4.20.0
 - Objective-aligned score semantics calibration tranche.
 - Added confirmed-shortlist / strong-edge / priority-edge / elite-edge bands from raw baseline evidence.

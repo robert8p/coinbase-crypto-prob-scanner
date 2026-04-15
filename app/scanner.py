@@ -476,7 +476,7 @@ class ScannerService:
             "source_trigger": trigger,
             "source_run_finished_utc": datetime.now(timezone.utc).isoformat(),
             "market_regime_state": getattr(market_regime, "state", None),
-            "market_regime_actionability": getattr(market_regime, "actionability_state", None),
+            "market_regime_actionability": effective_market_regime_actionability if effective_market_regime_actionability is not None else getattr(market_regime, "actionability_state", None),
             "cooldown_active": bool(getattr(market_regime, "cooldown_active", False)),
             "cooldown_until_utc": getattr(market_regime, "cooldown_until_utc", None),
             "tracked_symbols": [r.get("symbol") for r in tracked_rows if r.get("symbol")],
@@ -1977,7 +1977,17 @@ class ScannerService:
             headline = f"{len(action_ready)} validated candidate{'s' if len(action_ready) != 1 else ''} ready now"
             summary = f"Validated live scores reached at least {validated_floor:.2f}. Prioritize the action-ready shortlist; {len(selective)} additional selective rows remain cautionary."
         elif validated_rows:
-            headline = f"{len(validated_rows)} validated-band row{'s' if len(validated_rows) != 1 else ''} surfaced, but none are action-ready"
+            if objective_confirmed_rows and confirmed_floor is not None:
+                if elite_edge_rows:
+                    headline = f"{len(objective_confirmed_rows)} confirmed-shortlist row{'s' if len(objective_confirmed_rows) != 1 else ''} surfaced, including {len(elite_edge_rows)} elite-edge name{'s' if len(elite_edge_rows) != 1 else ''}"
+                elif priority_edge_rows:
+                    headline = f"{len(objective_confirmed_rows)} confirmed-shortlist row{'s' if len(objective_confirmed_rows) != 1 else ''} surfaced, including {len(priority_edge_rows)} priority-edge name{'s' if len(priority_edge_rows) != 1 else ''}"
+                elif strong_edge_rows:
+                    headline = f"{len(objective_confirmed_rows)} confirmed-shortlist row{'s' if len(objective_confirmed_rows) != 1 else ''} surfaced"
+                else:
+                    headline = f"{len(validated_rows)} validated-band row{'s' if len(validated_rows) != 1 else ''} surfaced"
+            else:
+                headline = f"{len(validated_rows)} validated-band row{'s' if len(validated_rows) != 1 else ''} surfaced, but none are action-ready"
             selective_count = len(validated_selective_rows)
             watchlist_count = len(validated_watchlist_rows)
             summary = (
@@ -2078,7 +2088,7 @@ class ScannerService:
             "top_focus_symbols": top_focus,
             "no_validated_candidates": len(validated_rows) == 0,
             "market_regime_state": getattr(market_regime, "state", None),
-            "market_regime_actionability": getattr(market_regime, "actionability_state", None),
+            "market_regime_actionability": effective_market_regime_actionability if effective_market_regime_actionability is not None else getattr(market_regime, "actionability_state", None),
             "blocked_rows": len(blocked_rows),
             "blocked_near_validated_rows": len(blocked_near_rows),
             "blocked_near_threshold_rows": len(blocked_near_threshold_rows),
@@ -2280,6 +2290,7 @@ class ScannerService:
         liquidity_tier: str,
         guard: dict,
         objective_band: dict | None = None,
+        effective_market_regime_actionability: str | None = None,
     ) -> dict:
         temporal_state = str(score_contract.get("temporal_tail_state") or "")
         temporal_semantics = str(score_contract.get("temporal_tail_semantics") or "")
@@ -2322,12 +2333,15 @@ class ScannerService:
         else:
             advisory_reasons.append("use as ranked watchlist only")
 
-        if str(market_regime.actionability_state or "") != "normal":
+        regime_actionability = str(effective_market_regime_actionability or getattr(market_regime, 'actionability_state', None) or "")
+        if regime_actionability not in {"", "normal", "advisory_only", "advisory_pending"}:
             if tier == "action_ready":
                 tier, rank = "selective", 2
             elif tier == "selective":
                 tier, rank = "watchlist", 1
-            policy_constraints.append(f"market regime is {market_regime.actionability_state}")
+            policy_constraints.append(f"market regime is {regime_actionability}")
+        elif regime_actionability in {"advisory_only", "advisory_pending"}:
+            advisory_reasons.append(f"market regime is {regime_actionability}")
 
         if str(liquidity_tier) == "tier3":
             if tier == "action_ready":
@@ -2497,6 +2511,7 @@ class ScannerService:
                 liquidity_tier=liquidity_tier,
                 guard=guard,
                 objective_band=self._score_band(live_score=trust["display_score"], score_contract=score_contract),
+                effective_market_regime_actionability=effective_market_regime_actionability,
             )
             score_band = self._score_band(live_score=trust["display_score"], score_contract=score_contract)
             pre_policy_band = self._score_band(live_score=prob_pre_regime, score_contract=score_contract)
@@ -3423,6 +3438,7 @@ class ScannerService:
                 liquidity_tier=liquidity_tier,
                 guard=guard,
                 objective_band=self._score_band(live_score=trust["display_score"], score_contract=score_contract),
+                effective_market_regime_actionability=effective_market_regime_actionability,
             )
             score_band = self._score_band(live_score=trust["display_score"], score_contract=score_contract)
             pre_policy_band = self._score_band(live_score=prob_pre_regime, score_contract=score_contract)
