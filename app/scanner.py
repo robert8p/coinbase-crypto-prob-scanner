@@ -32,6 +32,7 @@ from .universe import UniverseBuilder
 logger = logging.getLogger(__name__)
 
 from .version import APP_VERSION
+from .objective_semantics import load_objective_semantics_contract, score_objective_band
 
 
 @dataclass(slots=True)
@@ -61,6 +62,8 @@ class ScannerService:
         self._followup_lock = threading.RLock()
         self._followup_token = 0
         self.stage1_opportunity = None
+        self._objective_semantics_cache: dict | None = None
+        self._objective_semantics_cache_ts: float = 0.0
 
     def _locked_live_cohort(self) -> List[str] | None:
         if str(self.config.live_universe_mode).lower() != "trained_cohort":
@@ -945,6 +948,20 @@ class ScannerService:
         effective_threshold = float(tier_plan.get("effective_threshold", row.get("live_threshold") or 0.0) or 0.0)
         return effective_threshold, tier_plan
 
+
+    def _objective_semantics_contract(self) -> dict:
+        now = time.time()
+        cached = self._objective_semantics_cache if isinstance(self._objective_semantics_cache, dict) else None
+        if cached is not None and (now - float(self._objective_semantics_cache_ts or 0.0)) <= 15.0:
+            return dict(cached)
+        contract = load_objective_semantics_contract(
+            self.config.model_dir,
+            live_threshold=effective_live_raw_threshold(self.config),
+            stage1_selection_mode=str(getattr(self.config, "stage1_selection_mode", "") or ""),
+        )
+        self._objective_semantics_cache = dict(contract or {})
+        self._objective_semantics_cache_ts = now
+        return dict(contract or {})
 
     def _validated_floor(self, score_contract: dict) -> float:
         validated = [float(x) for x in (score_contract.get("validated_thresholds") or []) if x is not None]
@@ -1876,6 +1893,10 @@ class ScannerService:
         validated_watchlist_rows = [r for r in validated_rows if str(r.get("actionability_tier") or "") == "watchlist"]
         near_rows = [r for r in visible_rows if str(r.get("score_band") or "") == "near_validated"]
         exploratory_rows = [r for r in visible_rows if str(r.get("score_band") or "") == "exploratory"]
+        objective_confirmed_rows = [r for r in visible_rows if str(r.get("objective_score_band") or "") in {"confirmed_shortlist", "strong_edge", "priority_edge", "elite_edge"}]
+        strong_edge_rows = [r for r in visible_rows if str(r.get("objective_score_band") or "") == "strong_edge"]
+        priority_edge_rows = [r for r in visible_rows if str(r.get("objective_score_band") or "") in {"priority_edge", "elite_edge"}]
+        elite_edge_rows = [r for r in visible_rows if str(r.get("objective_score_band") or "") == "elite_edge"]
         top_focus_n = max(1, int(getattr(self.config, "stage2_decision_focus_top_n", 5) or 5))
         blocked_focus_n = max(1, int(getattr(self.config, "stage2_blocked_focus_top_n", 3) or 3))
         top_focus = [
@@ -1890,6 +1911,9 @@ class ScannerService:
                 "score_band_label": r.get("score_band_label"),
                 "visibility_band": r.get("visibility_band"),
                 "visibility_band_label": r.get("visibility_band_label"),
+                "objective_score_band": r.get("objective_score_band"),
+                "objective_score_band_label": r.get("objective_score_band_label"),
+                "objective_quality_reference_rate": r.get("objective_quality_reference_rate"),
             }
             for r in visible_rows[:top_focus_n]
         ]
@@ -1921,6 +1945,9 @@ class ScannerService:
                 "score_band_label": r.get("score_band_label"),
                 "visibility_band": r.get("visibility_band"),
                 "visibility_band_label": r.get("visibility_band_label"),
+                "objective_score_band": r.get("objective_score_band"),
+                "objective_score_band_label": r.get("objective_score_band_label"),
+                "objective_quality_reference_rate": r.get("objective_quality_reference_rate"),
                 "liquidity_tier": r.get("liquidity_tier"),
                 "pre_policy_rank": r.get("pre_policy_rank") or r.get("candidate_rank_all"),
                 "suppression_reason": r.get("suppression_reason"),
@@ -1931,6 +1958,12 @@ class ScannerService:
         cooldown_active = bool(getattr(market_regime, "cooldown_active", False))
         cooldown_until_utc = getattr(market_regime, "cooldown_until_utc", None)
         best_blocked_threshold_gap = min((float(r.get("distance_to_live_threshold") or 0.0) for r in blocked_rows), default=None)
+
+        objective_contract = self._objective_semantics_contract()
+        confirmed_floor = objective_contract.get("confirmed_shortlist_floor") if isinstance(objective_contract, dict) else None
+        strong_floor = objective_contract.get("strong_edge_floor") if isinstance(objective_contract, dict) else None
+        priority_floor = objective_contract.get("priority_edge_floor") if isinstance(objective_contract, dict) else None
+        confirmed_quality = objective_contract.get("confirmed_shortlist_quality_reference") if isinstance(objective_contract, dict) else None
 
         if action_ready:
             headline = f"{len(action_ready)} validated candidate{'s' if len(action_ready) != 1 else ''} ready now"
@@ -1956,8 +1989,22 @@ class ScannerService:
             if hidden_watchlist_rows > 0:
                 summary += f" {hidden_watchlist_rows} lower-priority watchlist rows were hidden from the visible shortlist and preserved in the review pack."
         elif watchlist:
-            headline = "No validated candidates this scan"
-            summary = f"Visible names remain below the near-validated band ({near_floor:.2f}+). Treat the shortlist as exploratory only unless later scans improve."
+            if objective_confirmed_rows and confirmed_floor is not None:
+                headline = f"No validated-tail candidates; {len(objective_confirmed_rows)} confirmed-shortlist name{'s' if len(objective_confirmed_rows) != 1 else ''} surfaced"
+                summary = (
+                    f"{len(objective_confirmed_rows)} visible row{'s' if len(objective_confirmed_rows) != 1 else ''} cleared the confirmed shortlist floor ({float(confirmed_floor):.2f}+)"
+                )
+                if confirmed_quality is not None:
+                    summary += f", where current resolved visible quality is {float(confirmed_quality) * 100.0:.1f}%"
+                summary += ". "
+                if strong_floor is not None:
+                    summary += f"{len(strong_edge_rows)} reached the strong edge band ({float(strong_floor):.2f}+). "
+                if priority_floor is not None:
+                    summary += f"{len(priority_edge_rows)} reached the priority edge band ({float(priority_floor):.2f}+). "
+                summary += f"None reached the validated tail-probability band ({validated_floor:.2f}+), so use them as ranked decision-support names rather than tail-validated probabilities."
+            else:
+                headline = "No validated candidates this scan"
+                summary = f"Visible names remain below the near-validated band ({near_floor:.2f}+). Treat the shortlist as exploratory only unless later scans improve."
             if blocked_near_threshold_rows and best_blocked_threshold_gap is not None:
                 symbols = ", ".join(str(r.get("symbol")) for r in blocked_focus[:blocked_focus_n] if r.get("symbol"))
                 summary += f" {len(blocked_near_threshold_rows)} blocked monitoring names sit within {best_blocked_threshold_gap * 100.0:.1f} percentage points of the current live threshold ({symbols or 'see blocked monitoring rows'})."
@@ -2003,6 +2050,11 @@ class ScannerService:
             "validated_watchlist_rows": len(validated_watchlist_rows),
             "near_validated_rows": len(near_rows),
             "exploratory_rows": len(exploratory_rows),
+            "objective_confirmed_rows": len(objective_confirmed_rows),
+            "strong_edge_rows": len(strong_edge_rows),
+            "priority_edge_rows": len(priority_edge_rows),
+            "elite_edge_rows": len(elite_edge_rows),
+            "objective_semantics_contract": objective_contract if isinstance(objective_contract, dict) else {},
             "hidden_watchlist_rows": hidden_watchlist_rows,
             "top_focus_symbols": top_focus,
             "no_validated_candidates": len(validated_rows) == 0,
@@ -2208,6 +2260,7 @@ class ScannerService:
         market_regime,
         liquidity_tier: str,
         guard: dict,
+        objective_band: dict | None = None,
     ) -> dict:
         temporal_state = str(score_contract.get("temporal_tail_state") or "")
         temporal_semantics = str(score_contract.get("temporal_tail_semantics") or "")
@@ -2218,9 +2271,18 @@ class ScannerService:
         rank = 1
         actionability_type = "advisory_heuristic"
 
+        objective_band = dict(objective_band or {})
+        objective_label = str(objective_band.get("objective_score_band_label") or "")
+        objective_code = str(objective_band.get("objective_score_band") or "")
         if str(trust.get("probability_semantics") or "") != "validated_tail_probability":
             validated_thresholds = [float(x) for x in (score_contract.get("validated_thresholds") or [])]
-            if validated_thresholds:
+            if objective_code in {"confirmed_shortlist", "strong_edge", "priority_edge", "elite_edge"}:
+                actionability_type = "objective_semantics_supported"
+                advisory_reasons.append(f"below tail-validated probability band, but inside {objective_label.lower()} from replay/current shortlist evidence")
+                if objective_code in {"priority_edge", "elite_edge"}:
+                    tier = "selective"
+                    rank = max(rank, 2)
+            elif validated_thresholds:
                 lowest_validated = min(validated_thresholds)
                 advisory_reasons.append(f"row score fell below validated tail band after policy (<{lowest_validated:.2f})")
             else:
@@ -2415,6 +2477,7 @@ class ScannerService:
                 market_regime=market_regime,
                 liquidity_tier=liquidity_tier,
                 guard=guard,
+                objective_band=self._score_band(live_score=trust["display_score"], score_contract=score_contract),
             )
             score_band = self._score_band(live_score=trust["display_score"], score_contract=score_contract)
             pre_policy_band = self._score_band(live_score=prob_pre_regime, score_contract=score_contract)
@@ -2448,6 +2511,17 @@ class ScannerService:
                 "score_band": score_band["score_band"],
                 "score_band_label": score_band["score_band_label"],
                 "monitor_priority": score_band["monitor_priority"],
+                "objective_score_band": score_band.get("objective_score_band"),
+                "objective_score_band_label": score_band.get("objective_score_band_label"),
+                "objective_monitor_priority": score_band.get("objective_monitor_priority"),
+                "objective_quality_reference_rate": score_band.get("objective_quality_reference_rate"),
+                "objective_quality_reference_source": score_band.get("objective_quality_reference_source"),
+                "objective_distance_to_confirmed_shortlist": score_band.get("objective_distance_to_confirmed_shortlist"),
+                "objective_distance_to_confirmed_shortlist_pct_points": score_band.get("objective_distance_to_confirmed_shortlist_pct_points"),
+                "objective_confirmed_shortlist_floor": score_band.get("objective_confirmed_shortlist_floor"),
+                "objective_strong_edge_floor": score_band.get("objective_strong_edge_floor"),
+                "objective_priority_edge_floor": score_band.get("objective_priority_edge_floor"),
+                "objective_elite_edge_floor": score_band.get("objective_elite_edge_floor"),
                 "opportunity_score": trust["opportunity_score"],
                 "probability_semantics": trust["probability_semantics"],
                 "tail_trust_state": trust["tail_trust_state"],
@@ -3329,6 +3403,7 @@ class ScannerService:
                 market_regime=market_regime,
                 liquidity_tier=liquidity_tier,
                 guard=guard,
+                objective_band=self._score_band(live_score=trust["display_score"], score_contract=score_contract),
             )
             score_band = self._score_band(live_score=trust["display_score"], score_contract=score_contract)
             pre_policy_band = self._score_band(live_score=prob_pre_regime, score_contract=score_contract)
@@ -3369,6 +3444,17 @@ class ScannerService:
                 "score_band": score_band["score_band"],
                 "score_band_label": score_band["score_band_label"],
                 "monitor_priority": score_band["monitor_priority"],
+                "objective_score_band": score_band.get("objective_score_band"),
+                "objective_score_band_label": score_band.get("objective_score_band_label"),
+                "objective_monitor_priority": score_band.get("objective_monitor_priority"),
+                "objective_quality_reference_rate": score_band.get("objective_quality_reference_rate"),
+                "objective_quality_reference_source": score_band.get("objective_quality_reference_source"),
+                "objective_distance_to_confirmed_shortlist": score_band.get("objective_distance_to_confirmed_shortlist"),
+                "objective_distance_to_confirmed_shortlist_pct_points": score_band.get("objective_distance_to_confirmed_shortlist_pct_points"),
+                "objective_confirmed_shortlist_floor": score_band.get("objective_confirmed_shortlist_floor"),
+                "objective_strong_edge_floor": score_band.get("objective_strong_edge_floor"),
+                "objective_priority_edge_floor": score_band.get("objective_priority_edge_floor"),
+                "objective_elite_edge_floor": score_band.get("objective_elite_edge_floor"),
                 "opportunity_score": trust["opportunity_score"],
                 "probability_semantics": trust["probability_semantics"],
                 "tail_trust_state": trust["tail_trust_state"],

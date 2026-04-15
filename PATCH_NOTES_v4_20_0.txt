@@ -1,0 +1,19 @@
+Coinbase Crypto Prob Scanner v4.20.0
+
+What changed
+- Added objective-aligned score semantics derived from the raw score baseline and checkpoint evidence.
+- Kept live selection logic unchanged.
+- Visible and informational rows now carry two separate semantic views:
+  - tail-validity band: validated tail probability semantics
+  - objective edge band: confirmed shortlist / strong edge / priority edge / elite edge
+- Decision summary now stops calling confirmed-shortlist rows purely exploratory when the replay-backed baseline and live checkpoint say otherwise.
+- Review-pack CSV exports now include the new objective semantics fields.
+
+Why
+- The baseline showed usable raw ranking, a live tail that is not dead, and little downstream compression.
+- The remaining blocker is score semantics, not another shortlist-policy loop.
+
+Live path
+- effective live selection engine unchanged
+- stage1 mode unchanged
+- live threshold unchanged

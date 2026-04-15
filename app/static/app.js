@@ -432,9 +432,12 @@ function scoreRowHtml(row, informational) {
   const utilityNote = (row.utility_decision_score === undefined && row.utility_confidence === undefined)
     ? ''
     : '<br><span class="small">decision ' + fmtNum(row.utility_decision_score, 3) + ' / conf ' + fmtPct(row.utility_confidence) + '</span><br><span class="small">edge ' + fmtNum(row.utility_expected_edge, 3) + ' / rank ' + (row.utility_rank || '-') + '</span>' ;
+  const objectiveNote = row.objective_score_band_label
+    ? '<br><span class="small">Edge: ' + row.objective_score_band_label + (row.objective_quality_reference_rate === null || row.objective_quality_reference_rate === undefined ? '' : ' / ref ' + fmtPct(row.objective_quality_reference_rate)) + '</span>'
+    : '';
   const bucketNote = informational
-    ? '<span class="small">Suppressed: ' + (row.suppression_reason || '-') + '</span><br><span class="small">Detail: ' + (row.suppression_reason_detail || row.policy_constraint_reason || '-') + '</span><br><span class="small">Pre-policy rank: ' + (row.pre_policy_rank || row.candidate_rank_all || '-') + '</span><br><span class="small">Pre-policy band: ' + (row.pre_policy_score_band_label || '-') + ' / gap ' + preGapText + '</span><br><span class="small">Live band: ' + (row.score_band_label || '-') + ' / gap ' + gapText + '</span>' + utilityNote
-    : '<span class="small">' + (row.actionability_tier || '-') + '</span><br><span class="small">' + (row.score_band_label || '-') + ' / gap ' + gapText + '</span>' + utilityNote;
+    ? '<span class="small">Suppressed: ' + (row.suppression_reason || '-') + '</span><br><span class="small">Detail: ' + (row.suppression_reason_detail || row.policy_constraint_reason || '-') + '</span><br><span class="small">Pre-policy rank: ' + (row.pre_policy_rank || row.candidate_rank_all || '-') + '</span><br><span class="small">Pre-policy band: ' + (row.pre_policy_score_band_label || '-') + ' / gap ' + preGapText + '</span><br><span class="small">Tail band: ' + (row.score_band_label || '-') + ' / gap ' + gapText + '</span>' + objectiveNote + utilityNote
+    : '<span class="small">' + (row.actionability_tier || '-') + '</span><br><span class="small">Tail band: ' + (row.score_band_label || '-') + ' / gap ' + gapText + '</span>' + objectiveNote + utilityNote;
   return '<tr>' +
     '<td>' + rank + '</td>' +
     '<td>' + row.symbol + '</td>' +
@@ -442,7 +445,7 @@ function scoreRowHtml(row, informational) {
     '<td><strong>' + fmtPct(row.live_score || row.prob_2) + '</strong> <span class="pill' + (row.pt2 === 'trained' ? ' pill-lgbm' : '') + '">' + row.pt2 + '</span></td>' +
     '<td>' + fmtNum((row.utility_decision_score ?? row.opportunity_score), row.utility_decision_score === undefined ? 1 : 3) + '</td>' +
     '<td>' + stage + ' <span class="small">(' + scope + ')</span><br>' + bucketNote + '</td>' +
-    '<td>' + (row.probability_semantics || row.contract_truth_semantics || '-') + '<br><span class="small">' + (row.actionability_type || '-') + '</span></td>' +
+    '<td>' + (row.probability_semantics || row.contract_truth_semantics || '-') + '<br><span class="small">' + (row.objective_score_band_label || '-') + '</span><br><span class="small">' + (row.actionability_type || '-') + '</span></td>' +
     '<td>' + fmtPct(row.prob_2_pre_regime) + '</td>' +
     '<td>' + fmtPct(row.prob_2_model) + '</td>' +
     '<td>' + fmtPct(row.live_threshold) + '</td>' +

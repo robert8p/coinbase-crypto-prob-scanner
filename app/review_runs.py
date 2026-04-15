@@ -147,7 +147,9 @@ ROW_CSV_FIELDS = [
     "entry_utc", "entry_price", "target_move_pct", "target_horizon_minutes", "quality_max_mae",
     "quality_min_end_ret", "candidate_stage", "prob_2_model", "prob_2_pre_regime", "pre_policy_score",
     "prob_2_rank", "prob_2", "live_score", "live_threshold", "validated_floor", "distance_to_validated", "distance_to_live_threshold", "score_band",
-    "score_band_label", "visibility_band", "visibility_band_label", "monitor_priority", "opportunity_score", "risk", "liquidity_tier",
+    "score_band_label", "objective_score_band", "objective_score_band_label", "objective_monitor_priority", "objective_quality_reference_rate",
+    "objective_quality_reference_source", "objective_distance_to_confirmed_shortlist", "objective_confirmed_shortlist_floor", "objective_strong_edge_floor",
+    "objective_priority_edge_floor", "objective_elite_edge_floor", "visibility_band", "visibility_band_label", "monitor_priority", "opportunity_score", "risk", "liquidity_tier",
     "actionability_tier", "actionability_type", "actionability_reason", "policy_constraint_reason",
     "pre_policy_rank", "candidate_rank_all", "informational_rank", "contract_truth_state",
     "contract_truth_semantics", "temporal_tail_state", "temporal_tail_semantics", "market_regime_state",
@@ -158,7 +160,7 @@ ROW_CSV_FIELDS = [
 
 BLOCKED_FOCUS_FIELDS = [
     "symbol", "pre_policy_rank", "liquidity_tier", "pre_policy_score", "live_score", "live_threshold", "pre_policy_distance_to_validated", "distance_to_validated",
-    "distance_to_live_threshold", "distance_to_live_threshold_pct_points", "pre_policy_score_band", "pre_policy_score_band_label", "score_band", "score_band_label",
+    "distance_to_live_threshold", "distance_to_live_threshold_pct_points", "pre_policy_score_band", "pre_policy_score_band_label", "score_band", "score_band_label", "objective_score_band", "objective_score_band_label",
     "visibility_band", "visibility_band_label", "suppression_reason", "suppression_reason_detail",
 ]
 
@@ -172,7 +174,7 @@ FOLLOWUP_CHANGE_FIELDS = [
 TRACKED_VISIBLE_FIELDS = [
     "symbol", "tracked_rank", "row_type", "actionability_tier", "pre_policy_rank", "candidate_rank_all",
     "pre_policy_score", "live_score", "live_threshold", "distance_to_validated", "distance_to_live_threshold",
-    "score_band", "score_band_label", "visibility_band", "visibility_band_label", "delta_live_score", "delta_pre_policy_score",
+    "score_band", "score_band_label", "objective_score_band", "objective_score_band_label", "visibility_band", "visibility_band_label", "delta_live_score", "delta_pre_policy_score",
 ]
 
 TOP_PRETRIM_FIELDS = [

@@ -574,6 +574,7 @@ class HistoricalReplayService:
                 market_regime=market_regime,
                 liquidity_tier=liquidity_tier,
                 guard=guard,
+                objective_band=self.scanner._score_band(live_score=trust["display_score"], score_contract=score_contract),
             )
             score_band = self.scanner._score_band(live_score=trust["display_score"], score_contract=score_contract)
             pre_policy_band = self.scanner._score_band(live_score=prob_pre_regime, score_contract=score_contract)
@@ -613,6 +614,17 @@ class HistoricalReplayService:
                 "score_band": score_band["score_band"],
                 "score_band_label": score_band["score_band_label"],
                 "monitor_priority": score_band["monitor_priority"],
+                "objective_score_band": score_band.get("objective_score_band"),
+                "objective_score_band_label": score_band.get("objective_score_band_label"),
+                "objective_monitor_priority": score_band.get("objective_monitor_priority"),
+                "objective_quality_reference_rate": score_band.get("objective_quality_reference_rate"),
+                "objective_quality_reference_source": score_band.get("objective_quality_reference_source"),
+                "objective_distance_to_confirmed_shortlist": score_band.get("objective_distance_to_confirmed_shortlist"),
+                "objective_distance_to_confirmed_shortlist_pct_points": score_band.get("objective_distance_to_confirmed_shortlist_pct_points"),
+                "objective_confirmed_shortlist_floor": score_band.get("objective_confirmed_shortlist_floor"),
+                "objective_strong_edge_floor": score_band.get("objective_strong_edge_floor"),
+                "objective_priority_edge_floor": score_band.get("objective_priority_edge_floor"),
+                "objective_elite_edge_floor": score_band.get("objective_elite_edge_floor"),
                 "opportunity_score": trust["opportunity_score"],
                 "probability_semantics": trust["probability_semantics"],
                 "tail_trust_state": trust["tail_trust_state"],

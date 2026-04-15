@@ -1,3 +1,9 @@
+## v4.20.0
+- Objective-aligned score semantics calibration tranche.
+- Added confirmed-shortlist / strong-edge / priority-edge / elite-edge bands from raw baseline evidence.
+- Preserved live selection logic while fixing overly pessimistic row semantics and summaries.
+- Review-pack CSVs now include objective semantics fields.
+
 ## v4.19.0
 
 - Pivot away from another shortlist-policy loop and add a replay-backed Raw Score Baseline Lab.
