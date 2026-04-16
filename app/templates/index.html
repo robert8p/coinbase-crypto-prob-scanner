@@ -63,6 +63,8 @@
       <a href="/api/reviews/current-version-summary.txt"><button type="button">Download Current-Version Summary TXT</button></a>
       <a href="/api/model-output-distribution.txt"><button type="button">Download Model Output Distribution TXT</button></a>
       <a href="/api/reviews/raw-score-baseline/summary.txt"><button type="button">Download Raw Score Baseline TXT</button></a>
+      <a href="/api/semantics-comparison/latest-summary.txt"><button type="button">Download Semantics Comparison TXT</button></a>
+      <a href="/api/semantics-comparison/latest-pack.zip"><button type="button">Download Semantics Comparison Pack</button></a>
       <a href="/api/reviews/post-maturity-bundle.zip"><button type="button">Download Post-Maturity Bundle</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary"><button type="button">Open Fresh Retrain Audit Summary JSON</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary.txt"><button type="button">Download Fresh Retrain Audit Summary TXT</button></a>
@@ -238,6 +240,41 @@
     <p class="small muted" style="margin-top:0;">This is the governing next step when shortlist-policy search is exhausted. It answers whether the raw model tail and ranking are actually useful, and whether downstream shaping is compressing them.</p>
     <div id="rawScoreBaselineMessage" class="muted" style="margin-bottom:10px;"></div>
     <div id="rawScoreBaselinePanel"><p class="muted">No raw score baseline summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Semantics Comparison</h2>
+  <div class="card">
+    <p class="muted">Offline-only comparator for this tranche. It runs the exact current 0.35 path, a contract-aligned recalibrated shortlist semantics path, and a 0.28 widening reference path on one shared replay frame without changing live runtime behavior.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="control-group">
+        <div class="label">Admin password</div>
+        <input id="semanticsComparisonAdminPassword" placeholder="Admin password" type="password" />
+      </div>
+      <div class="control-group">
+        <div class="label">Hours</div>
+        <input id="semanticsComparisonHours" type="number" min="24" step="24" value="168" />
+      </div>
+      <div class="control-group">
+        <div class="label">Step minutes</div>
+        <input id="semanticsComparisonStepMinutes" type="number" min="5" step="5" value="120" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max scans</div>
+        <input id="semanticsComparisonMaxScans" type="number" min="1" step="1" value="84" />
+      </div>
+      <div class="control-group">
+        <div class="label">Max symbols</div>
+        <input id="semanticsComparisonMaxSymbols" type="number" min="1" step="1" value="100" />
+      </div>
+      <button id="runSemanticsComparisonButton" type="button">Run Semantics Comparison</button>
+      <button id="loadSemanticsComparisonSummaryButton" type="button">Load Semantics Comparison Summary</button>
+      <button id="downloadSemanticsComparisonPackButton" type="button">Download Semantics Comparison Pack</button>
+      <a href="/api/semantics-comparison/latest-summary.txt"><button type="button">Download Semantics Comparison TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">This tranche is deliberately offline-only. It compares shortlist semantics around the existing ranking before any live threshold or Stage 1 change.</p>
+    <div id="semanticsComparisonMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="semanticsComparisonPanel"><p class="muted">No semantics comparison summary loaded yet.</p></div>
   </div>
 
 

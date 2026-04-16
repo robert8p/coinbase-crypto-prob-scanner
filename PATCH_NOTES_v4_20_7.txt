@@ -1,0 +1,26 @@
+Coinbase Crypto Prob Scanner v4.20.7
+
+What changed
+- Added an offline/replay semantics comparison tranche around the existing ranking.
+- Added a shared-frame comparator for: current 0.35 path, contract-aligned recalibrated path, and 0.28 widening reference path.
+- Added operator-share outputs for the semantics comparison summary and pack.
+- Added homepage buttons to run and download the new semantics-comparison outputs.
+
+New endpoints
+- POST /api/semantics-comparison/run
+- GET /api/semantics-comparison/latest-summary
+- GET /api/semantics-comparison/latest-summary.txt
+- GET /api/semantics-comparison/latest-pack.zip
+
+Why
+- Test score-semantics recalibration before any live threshold or Stage 1 change.
+- Keep the live runtime path unchanged while building decision-grade offline evidence.
+- Compare a tighter contract-aligned shortlist against the exact current live semantics and a wider 0.28 reference on one like-for-like replay frame.
+
+Post-deploy operator checks
+1. Open /health and confirm version 4.20.7.
+2. Open the homepage and confirm the new Semantics Comparison controls are visible.
+3. Run the semantics comparison from the homepage or POST /api/semantics-comparison/run.
+4. Download /api/semantics-comparison/latest-pack.zip and confirm it contains the summary, comparison table, code-truth note, scope note, and per-path row exports.
+5. Download /api/control-ledger/ledger-input-pack.zip.
+6. Return the semantics comparison pack, semantics comparison summary, ledger input pack, and later the next matured current-version bundle for review.

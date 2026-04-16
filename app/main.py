@@ -67,6 +67,7 @@ from .evidence_automation import EvidenceAutomationService
 from .model_output_distribution import ModelOutputDistributionService
 from .utility_operator_automation import UtilityOperatorAutomationService
 from .control_ledger import ControlLedgerService
+from .semantics_comparison import SemanticsComparisonService
 from .version import APP_VERSION
 from .runtime_scope import initialize_runtime_scope
 
@@ -153,6 +154,7 @@ control_ledger = ControlLedgerService(
     app_name="Coinbase Crypto Prob Scanner",
     objective="Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
 )
+semantics_comparison = SemanticsComparisonService(config, replay, review_packs)
 
 
 def _dict_to_text(payload: dict) -> str:
@@ -875,6 +877,44 @@ def raw_score_baseline_latest_pack(_=Depends(require_admin_or_query)):
     if not pack:
         raise HTTPException(status_code=404, detail="no raw score baseline pack available")
     return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
+
+@app.post("/api/semantics-comparison/run")
+def api_semantics_comparison_run(
+    hours: int = Query(default=168, ge=24, le=24 * 90),
+    step_minutes: int = Query(default=120, ge=5, le=24 * 60),
+    max_scans: int = Query(default=84, ge=1, le=500),
+    max_symbols: int = Query(default=100, ge=1, le=500),
+    _=Depends(require_admin),
+):
+    return semantics_comparison.run(hours=hours, step_minutes=step_minutes, max_scans=max_scans, max_symbols=max_symbols)
+
+
+@app.get("/api/semantics-comparison/latest-summary")
+def api_semantics_comparison_summary():
+    return semantics_comparison.latest_summary()
+
+
+@app.get("/api/semantics-comparison/latest-summary.txt")
+def api_semantics_comparison_summary_txt():
+    payload = semantics_comparison.latest_summary()
+    if not payload:
+        raise HTTPException(status_code=404, detail="no semantics comparison summary available")
+    generated = ((payload.get("generated_at_utc") or payload.get("app_version") or "latest").replace(":", "-"))
+    filename = f"semantics_comparison_{generated}.txt"
+    body = json.dumps(payload, indent=2, sort_keys=True, default=str)
+    return PlainTextResponse(
+        content=body,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/semantics-comparison/latest-pack.zip")
+def api_semantics_comparison_pack(_=Depends(require_admin_or_query)):
+    pack = semantics_comparison.latest_pack()
+    if not pack:
+        raise HTTPException(status_code=404, detail="no semantics comparison pack available")
+    return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
+
 
 @app.post("/api/benchmark/run-threshold-sweep")
 def run_benchmark_threshold_sweep(

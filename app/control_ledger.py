@@ -137,6 +137,7 @@ class ControlLedgerService:
             "latest_evaluated_pack": review_dir / "latest_evaluated_pack.zip",
             "latest_post_maturity_bundle": Path(self.config.model_dir) / "reviews" / "latest_post_maturity_review_bundle.zip",
             "latest_replay_pack": replay_dir / "latest_replay_pack.zip",
+            "latest_semantics_comparison_pack": Path(self.config.model_dir) / "semantics_comparison" / "latest_semantics_comparison_pack.zip",
             "model_bundle_pt2": Path(self.config.model_path_pt2),
         }
         out: dict[str, dict[str, Any]] = {}
@@ -176,6 +177,9 @@ class ControlLedgerService:
             "current_version_summary_txt": "/api/reviews/current-version-summary.txt",
             "current_version_bundle_zip": "/api/reviews/current-version.zip",
             "post_maturity_bundle_zip": "/api/reviews/post-maturity-bundle.zip",
+            "semantics_comparison_summary_json": "/api/semantics-comparison/latest-summary",
+            "semantics_comparison_summary_txt": "/api/semantics-comparison/latest-summary.txt",
+            "semantics_comparison_pack_zip": "/api/semantics-comparison/latest-pack.zip",
         }
         payload = {
             "generated_at_utc": self._now(),

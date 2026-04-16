@@ -1,43 +1,40 @@
 {
   "app_name": "Coinbase Crypto Prob Scanner",
-  "app_version": "4.20.6",
-  "release_type": "control_ledger_automation",
-  "tranche_title": "Control Ledger automation and operator exports",
-  "tranche_goal": "Automate the factual inputs required by the four-chat operating system without automating strategic judgment.",
+  "app_version": "4.20.7",
+  "release_type": "offline_semantics_comparison",
+  "tranche_title": "Offline/replay score-semantics recalibration around the existing ranking",
+  "tranche_goal": "Compare the exact current 0.35 path, a contract-aligned recalibrated shortlist semantics path, and a 0.28 widening reference path on one shared replay frame before any live policy change.",
   "objective": "Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
   "new_endpoints": [
-    "/api/control-ledger/facts",
-    "/api/control-ledger/facts.txt",
-    "/api/control-ledger/release-manifest",
-    "/api/control-ledger/release-manifest.txt",
-    "/api/control-ledger/ledger-input-pack.zip"
+    "/api/semantics-comparison/run",
+    "/api/semantics-comparison/latest-summary",
+    "/api/semantics-comparison/latest-summary.txt",
+    "/api/semantics-comparison/latest-pack.zip"
   ],
   "operator_outputs": [
-    "Control-Ledger Facts JSON",
-    "Control-Ledger Facts TXT",
-    "Release Manifest JSON",
-    "Release Manifest TXT",
-    "Ledger Input Pack ZIP"
+    "Semantics Comparison Summary JSON",
+    "Semantics Comparison Summary TXT",
+    "Semantics Comparison Pack ZIP",
+    "Control-Ledger Ledger Input Pack ZIP",
+    "Current-Version Bundle ZIP"
   ],
   "strategic_boundary": {
-    "auto_populated_by_app": [
-      "deployed version",
-      "runtime status",
-      "current-version evidence summary",
-      "artifact inventory",
-      "download paths",
-      "release metadata"
+    "unchanged_live_runtime": [
+      "no live threshold change",
+      "no Stage 1 mode change",
+      "no retrain promotion",
+      "no live selection-engine change"
     ],
-    "must_remain_ai_maintained": [
-      "current governing hypothesis",
-      "best next tranche",
-      "rejected paths",
-      "strategic uncertainties"
+    "this_tranche_scope_only": [
+      "offline/replay comparator",
+      "contract-aligned shortlist semantics reference",
+      "operator-share pack + summary outputs"
     ]
   },
   "expected_next_evidence": [
+    "latest semantics comparison pack zip",
+    "latest semantics comparison summary",
     "latest control-ledger input pack",
-    "updated shared Control Ledger",
-    "any screenshots or deployment notes not already captured by the pack"
+    "next post-maturity current-version bundle once the deployed version has resolved rows"
   ]
 }

@@ -3570,6 +3570,77 @@ function renderReviewRuns(payload) {
     }).join('') + '</tbody></table>';
 }
 
+function renderSemanticsComparisonSummary(payload) {
+  const panel = document.getElementById('semanticsComparisonPanel');
+  if (!panel) return;
+  if (!payload || payload.available === false) {
+    panel.innerHTML = '<p class="muted">' + escapeHtml((payload && payload.summary) || 'No semantics comparison summary loaded yet.') + '</p>';
+    return;
+  }
+  const rows = (payload.comparison_table || []).map(function(row) {
+    return '<tr>' +
+      '<td>' + escapeHtml(row.path_label || row.path_name || '-') + '</td>' +
+      '<td>' + fmtNum(row.visible_quality_hit_rate, 3) + '</td>' +
+      '<td>' + fmtNum(row.hidden_quality_hit_rate, 3) + '</td>' +
+      '<td>' + (row.visible_count ?? '-') + '</td>' +
+      '<td>' + (row.hidden_count ?? '-') + '</td>' +
+      '<td>' + fmtNum(row.top_3_quality_rate, 3) + '</td>' +
+      '<td>' + fmtNum(row.mean_shortlist_size, 2) + '</td>' +
+      '</tr>';
+  }).join('');
+  const best = payload.best_path_now || {};
+  const effects = (payload.obvious_effects || []).map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('');
+  panel.innerHTML =
+    '<p><strong>Headline:</strong> ' + escapeHtml(payload.headline || '-') + '</p>' +
+    '<p><strong>Summary:</strong> ' + escapeHtml(payload.summary || '-') + '</p>' +
+    '<p><strong>Best path now:</strong> ' + escapeHtml(best.path_label || best.path_name || '-') + '</p>' +
+    '<table><thead><tr><th>Path</th><th>Visible Q-hit</th><th>Hidden Q-hit</th><th>Visible rows</th><th>Hidden rows</th><th>Top-3 Q-hit</th><th>Mean shortlist</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="muted">No comparison rows yet</td></tr>') + '</tbody></table>' +
+    '<h3 style="margin-top:16px;">Code-truth note</h3>' +
+    '<p>' + escapeHtml(((payload.code_truth_note || {}).summary) || '-') + '</p>' +
+    '<h3 style="margin-top:16px;">Scope note</h3>' +
+    '<p>' + escapeHtml(((payload.scope_note || {}).summary) || '-') + '</p>' +
+    '<h3 style="margin-top:16px;">Obvious effects</h3>' +
+    '<ul>' + (effects || '<li class="muted">No obvious effects recorded yet.</li>') + '</ul>';
+}
+
+async function runSemanticsComparison() {
+  const pw = (document.getElementById('semanticsComparisonAdminPassword') || {}).value || '';
+  const hours = Number((document.getElementById('semanticsComparisonHours') || {}).value || 168);
+  const stepMinutes = Number((document.getElementById('semanticsComparisonStepMinutes') || {}).value || 120);
+  const maxScans = Number((document.getElementById('semanticsComparisonMaxScans') || {}).value || 84);
+  const maxSymbols = Number((document.getElementById('semanticsComparisonMaxSymbols') || {}).value || 100);
+  const msg = document.getElementById('semanticsComparisonMessage');
+  if (msg) msg.textContent = 'Running semantics comparison…';
+  try {
+    const params = new URLSearchParams({
+      hours: String(hours),
+      step_minutes: String(stepMinutes),
+      max_scans: String(maxScans),
+      max_symbols: String(maxSymbols),
+    });
+    const out = await getJson('/api/semantics-comparison/run?' + params.toString(), { method: 'POST', headers: { 'X-Admin-Password': pw } });
+    if (msg) msg.textContent = (out.summary || {}).headline || 'Semantics comparison completed.';
+    renderSemanticsComparisonSummary(out.summary || out);
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
+}
+
+async function loadSemanticsComparisonSummary(silent) {
+  const msg = document.getElementById('semanticsComparisonMessage');
+  try {
+    const payload = await getJson('/api/semantics-comparison/latest-summary');
+    renderSemanticsComparisonSummary(payload);
+    if (msg && !silent) msg.textContent = payload.headline || 'Loaded semantics comparison summary.';
+  } catch (e) {
+    if (msg && !silent) msg.textContent = e.message;
+  }
+}
+
+function downloadSemanticsComparisonPack() {
+  window.location.href = '/api/semantics-comparison/latest-pack.zip';
+}
+
 async function refreshAll() {
   attachSortHandlers();
   try {
@@ -3803,3 +3874,10 @@ if (decisionBranchToggleButton) decisionBranchToggleButton.addEventListener('cli
 if (decisionBranchExecuteButton) decisionBranchExecuteButton.addEventListener('click', executeDecisionBranchNow);
 if (decisionBranchClearButton) decisionBranchClearButton.addEventListener('click', clearDecisionBranchOverride);
 if (decisionBranchAckButton) decisionBranchAckButton.addEventListener('click', acknowledgeDecisionBranch);
+const runSemanticsComparisonButton = document.getElementById('runSemanticsComparisonButton');
+const loadSemanticsComparisonSummaryButton = document.getElementById('loadSemanticsComparisonSummaryButton');
+const downloadSemanticsComparisonPackButton = document.getElementById('downloadSemanticsComparisonPackButton');
+if (runSemanticsComparisonButton) runSemanticsComparisonButton.addEventListener('click', runSemanticsComparison);
+if (loadSemanticsComparisonSummaryButton) loadSemanticsComparisonSummaryButton.addEventListener('click', function() { loadSemanticsComparisonSummary(false); });
+if (downloadSemanticsComparisonPackButton) downloadSemanticsComparisonPackButton.addEventListener('click', downloadSemanticsComparisonPack);
+loadSemanticsComparisonSummary(true);
