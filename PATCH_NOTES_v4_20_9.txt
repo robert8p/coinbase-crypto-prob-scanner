@@ -1,0 +1,15 @@
+Coinbase Crypto Prob Scanner v4.20.9
+
+Tranche: Objective-aligned semantics shadow proof
+
+What changed
+- Added an objective-aligned recommendation on top of the semantics comparison so the app no longer treats raw quality-gap alone as the decision rule.
+- Added automatic semantics shadow comparison recording on completed live scans while leaving the live legacy shortlist unchanged.
+- Added resolved semantics shadow outcome review outputs so the contract-aligned challenger can be judged on real matured rows before any live promotion.
+- Added visible UI buttons for the new semantics shadow outputs.
+- Added control-ledger download paths and artifact inventory entries for the new packs.
+
+Strategic effect
+- The 0.28 widening reference remains an offline reference, not a live candidate.
+- The contract-aligned path is now the only semantics challenger advanced to live shadow because it improved visible quality without widening shortlist noise in the offline comparison.
+- Live runtime behavior stays unchanged while evidence quality improves.

@@ -1,20 +1,25 @@
 {
   "app_name": "Coinbase Crypto Prob Scanner",
-  "app_version": "4.20.8",
-  "release_type": "offline_semantics_comparison",
-  "tranche_title": "Semantics comparison execution hotfix",
-  "tranche_goal": "Fix the broken semantics comparison run path so the offline comparator executes, and make pack download use the entered admin password instead of an unauthenticated link.",
+  "app_version": "4.20.9",
+  "release_type": "semantics_shadow_proof",
+  "tranche_title": "Objective-aligned semantics shadow proof",
+  "tranche_goal": "Keep the live legacy shortlist unchanged, correct the semantics-comparison decision signal so it reflects the app's true objective, and automatically record the contract-aligned semantics challenger in live shadow with resolved outcome review outputs.",
   "objective": "Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
   "new_endpoints": [
-    "/api/semantics-comparison/run",
-    "/api/semantics-comparison/latest-summary",
-    "/api/semantics-comparison/latest-summary.txt",
-    "/api/semantics-comparison/latest-pack.zip"
+    "/api/semantics-shadow-comparison/summary",
+    "/api/semantics-shadow-comparison/summary.txt",
+    "/api/semantics-shadow-comparison/latest-pack.zip",
+    "/api/semantics-shadow-outcome-review/summary",
+    "/api/semantics-shadow-outcome-review/summary.txt",
+    "/api/semantics-shadow-outcome-review/latest-pack.zip"
   ],
   "operator_outputs": [
-    "Semantics Comparison Summary JSON",
-    "Semantics Comparison Summary TXT",
+    "Semantics Comparison Summary JSON/TXT",
     "Semantics Comparison Pack ZIP",
+    "Semantics Shadow Comparison Summary JSON/TXT",
+    "Semantics Shadow Comparison Pack ZIP",
+    "Semantics Shadow Outcome Review Summary JSON/TXT",
+    "Semantics Shadow Outcome Review Pack ZIP",
     "Control-Ledger Ledger Input Pack ZIP",
     "Current-Version Bundle ZIP"
   ],
@@ -26,15 +31,17 @@
       "no live selection-engine change"
     ],
     "this_tranche_scope_only": [
-      "offline/replay comparator",
-      "contract-aligned shortlist semantics reference",
-      "operator-share pack + summary outputs"
+      "objective-aligned semantics recommendation",
+      "contract challenger shadow recording on completed scans",
+      "resolved shadow outcome review outputs"
     ]
   },
   "expected_next_evidence": [
-    "latest semantics comparison pack zip",
-    "latest semantics comparison summary",
+    "latest semantics shadow comparison summary",
+    "latest semantics shadow comparison pack zip",
+    "latest semantics shadow outcome review summary",
+    "latest semantics shadow outcome review pack zip",
     "latest control-ledger input pack",
-    "next post-maturity current-version bundle once the deployed version has resolved rows"
+    "next matured current-version bundle once the deployed version has resolved rows"
   ]
 }

@@ -90,12 +90,28 @@ class SemanticsComparisonService:
     def latest_summary(self) -> dict:
         payload = read_json(self.summary_path, {})
         if isinstance(payload, dict) and payload:
+            payload.setdefault("best_path_by_gap", dict(payload.get("best_path_now") or {}))
+            payload.setdefault("objective_aligned_recommendation", self._objective_aligned_recommendation(payload))
+            payload.setdefault("next_live_shadow_candidate", self._next_live_shadow_candidate(payload))
             return payload
         return {
             "available": False,
             "app_version": APP_VERSION,
             "headline": "No semantics comparison has been run yet.",
             "summary": "Run the offline semantics comparison to compare the current 0.35 path, the contract-aligned recalibration path, and the 0.28 widening reference path on one shared replay frame.",
+            "objective_aligned_recommendation": {
+                "status": "missing_comparison",
+                "recommended_path_name": None,
+                "recommended_path_label": None,
+                "reason": "No completed semantics comparison is available yet.",
+                "shadow_ready": False,
+            },
+            "next_live_shadow_candidate": {
+                "available": False,
+                "path_name": None,
+                "path_label": None,
+                "reason": "No completed semantics comparison is available yet.",
+            },
         }
 
     def latest_pack(self) -> Path | None:
@@ -208,6 +224,14 @@ class SemanticsComparisonService:
 
         comparison_rows = [current_summary, contract_summary, widening_summary]
         best_path = self._choose_best_path(comparison_rows)
+        objective_recommendation = self._objective_aligned_recommendation({
+            "paths": {
+                "current_035_path": current_summary,
+                "recalibrated_contract_path": contract_summary,
+                "widening_028_reference_path": widening_summary,
+            }
+        })
+        next_live_shadow_candidate = self._next_live_shadow_candidate({"objective_aligned_recommendation": objective_recommendation})
         headline, summary_text, obvious_effects = self._headline_and_effects(
             current_summary=current_summary,
             contract_summary=contract_summary,
@@ -535,6 +559,61 @@ class SemanticsComparisonService:
             "symbol_hhi": round(hhi, 6),
         }
 
+    def _objective_aligned_recommendation(self, payload: dict) -> dict:
+        paths = dict(payload.get("paths") or {})
+        current = dict(paths.get("current_035_path") or {})
+        contract = dict(paths.get("recalibrated_contract_path") or {})
+        widening = dict(paths.get("widening_028_reference_path") or {})
+        if not current or not contract:
+            return {
+                "status": "missing_comparison",
+                "recommended_path_name": None,
+                "recommended_path_label": None,
+                "reason": "No completed semantics comparison is available yet.",
+                "shadow_ready": False,
+            }
+        current_visible_q = _f(((current.get("visible") or {}).get("quality_hit_rate")), 0.0) or 0.0
+        current_top3 = _f((((current.get("topk_quality") or {}).get("top_3") or {}).get("mean_quality_rate")), 0.0) or 0.0
+        current_shortlist = _f(((current.get("shortlist_size_distribution") or {}).get("mean")), 999.0) or 999.0
+        contract_visible_q = _f(((contract.get("visible") or {}).get("quality_hit_rate")), 0.0) or 0.0
+        contract_top3 = _f((((contract.get("topk_quality") or {}).get("top_3") or {}).get("mean_quality_rate")), 0.0) or 0.0
+        contract_shortlist = _f(((contract.get("shortlist_size_distribution") or {}).get("mean")), 999.0) or 999.0
+        widening_visible_q = _f(((widening.get("visible") or {}).get("quality_hit_rate")), 0.0) or 0.0
+        widening_shortlist = _f(((widening.get("shortlist_size_distribution") or {}).get("mean")), 999.0) or 999.0
+        if contract_visible_q >= current_visible_q and contract_top3 >= (current_top3 - 0.01) and contract_shortlist <= current_shortlist:
+            return {
+                "status": "supported_offline",
+                "recommended_path_name": "recalibrated_contract_path",
+                "recommended_path_label": "Recalibrated contract-aligned path",
+                "reason": "The contract-aligned path improves visible quality without widening the shortlist, so it is the objective-aligned challenger.",
+                "shadow_ready": True,
+                "widening_objective_blocked": widening_visible_q < current_visible_q or widening_shortlist > (current_shortlist * 1.5),
+            }
+        return {
+            "status": "not_supported_offline",
+            "recommended_path_name": None,
+            "recommended_path_label": None,
+            "reason": "No challenger improved the visible shortlist on the app's true objective without adding shortlist noise.",
+            "shadow_ready": False,
+            "widening_objective_blocked": widening_visible_q < current_visible_q or widening_shortlist > (current_shortlist * 1.5),
+        }
+
+    def _next_live_shadow_candidate(self, payload: dict) -> dict:
+        rec = dict(payload.get("objective_aligned_recommendation") or self._objective_aligned_recommendation(payload) or {})
+        if rec.get("shadow_ready") and rec.get("recommended_path_name"):
+            return {
+                "available": True,
+                "path_name": rec.get("recommended_path_name"),
+                "path_label": rec.get("recommended_path_label"),
+                "reason": rec.get("reason"),
+            }
+        return {
+            "available": False,
+            "path_name": None,
+            "path_label": None,
+            "reason": rec.get("reason") or "No objective-aligned challenger is ready for a live shadow proof window.",
+        }
+
     def _choose_best_path(self, summaries: list[dict]) -> dict:
         def _score(item: dict) -> tuple:
             visible_quality = _f(((item.get("visible") or {}).get("quality_hit_rate")), 0.0) or 0.0
@@ -647,9 +726,13 @@ class SemanticsComparisonService:
             str(summary.get("headline") or ""),
             str(summary.get("summary") or ""),
             "",
-            "Best path now:",
-            f"- {((summary.get('best_path_now') or {}).get('path_label')) or '-'}",
-            f"- Reason: {((summary.get('best_path_now') or {}).get('reason')) or '-'}",
+            "Best path by gap heuristic:",
+            f"- {((summary.get('best_path_by_gap') or summary.get('best_path_now') or {}).get('path_label')) or '-'}",
+            f"- Reason: {((summary.get('best_path_by_gap') or summary.get('best_path_now') or {}).get('reason')) or '-'}",
+            "",
+            "Objective-aligned recommendation:",
+            f"- {((summary.get('objective_aligned_recommendation') or {}).get('recommended_path_label')) or '-'}",
+            f"- Reason: {((summary.get('objective_aligned_recommendation') or {}).get('reason')) or '-'}",
             "",
             "Comparison table:",
         ]

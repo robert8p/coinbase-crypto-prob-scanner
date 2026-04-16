@@ -3588,12 +3588,15 @@ function renderSemanticsComparisonSummary(payload) {
       '<td>' + fmtNum(row.mean_shortlist_size, 2) + '</td>' +
       '</tr>';
   }).join('');
-  const best = payload.best_path_now || {};
+  const best = payload.best_path_by_gap || payload.best_path_now || {};
+  const recommendation = payload.objective_aligned_recommendation || {};
   const effects = (payload.obvious_effects || []).map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('');
   panel.innerHTML =
     '<p><strong>Headline:</strong> ' + escapeHtml(payload.headline || '-') + '</p>' +
     '<p><strong>Summary:</strong> ' + escapeHtml(payload.summary || '-') + '</p>' +
-    '<p><strong>Best path now:</strong> ' + escapeHtml(best.path_label || best.path_name || '-') + '</p>' +
+    '<p><strong>Best path by gap heuristic:</strong> ' + escapeHtml(best.path_label || best.path_name || '-') + '</p>' +
+    '<p><strong>Objective-aligned recommendation:</strong> ' + escapeHtml(recommendation.recommended_path_label || '-') + '</p>' +
+    '<p><strong>Recommendation reason:</strong> ' + escapeHtml(recommendation.reason || '-') + '</p>' +
     '<table><thead><tr><th>Path</th><th>Visible Q-hit</th><th>Hidden Q-hit</th><th>Visible rows</th><th>Hidden rows</th><th>Top-3 Q-hit</th><th>Mean shortlist</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="muted">No comparison rows yet</td></tr>') + '</tbody></table>' +
     '<h3 style="margin-top:16px;">Code-truth note</h3>' +
     '<p>' + escapeHtml(((payload.code_truth_note || {}).summary) || '-') + '</p>' +
@@ -3648,6 +3651,80 @@ function downloadSemanticsComparisonPack() {
   window.location.href = semanticsComparisonPackUrl();
 }
 
+function renderSemanticsShadowSummary(payload) {
+  const panel = document.getElementById('semanticsShadowPanel');
+  if (!panel) return;
+  if (!payload || payload.available === false) {
+    panel.innerHTML = '<p class="muted">' + escapeHtml((payload && payload.summary) || 'No semantics shadow summary loaded yet.') + '</p>';
+    return;
+  }
+  const incumbent = payload.incumbent || {};
+  const challenger = payload.challenger || {};
+  const comparison = payload.comparison || {};
+  const recommendation = payload.objective_aligned_recommendation || {};
+  panel.innerHTML =
+    '<p><strong>Headline:</strong> ' + escapeHtml(payload.headline || '-') + '</p>' +
+    '<p><strong>Summary:</strong> ' + escapeHtml(payload.summary || '-') + '</p>' +
+    '<p><strong>Recommended challenger:</strong> ' + escapeHtml(recommendation.recommended_path_label || '-') + '</p>' +
+    '<p><strong>Reason:</strong> ' + escapeHtml(recommendation.reason || '-') + '</p>' +
+    '<table><thead><tr><th>Engine</th><th>Visible count</th><th>Mean live score</th></tr></thead><tbody>' +
+      '<tr><td>Live legacy</td><td>' + (incumbent.visible_count ?? '-') + '</td><td>' + fmtNum(incumbent.mean_live_score, 4) + '</td></tr>' +
+      '<tr><td>Contract challenger</td><td>' + (challenger.visible_count ?? '-') + '</td><td>' + fmtNum(challenger.mean_live_score, 4) + '</td></tr>' +
+    '</tbody></table>' +
+    '<p><strong>Overlap:</strong> ' + (comparison.overlap_count ?? '-') + ' &nbsp;|&nbsp; <strong>Incumbent only:</strong> ' + (comparison.incumbent_only_count ?? '-') + ' &nbsp;|&nbsp; <strong>Challenger only:</strong> ' + (comparison.challenger_only_count ?? '-') + '</p>';
+}
+
+function renderSemanticsShadowOutcomeSummary(payload) {
+  const panel = document.getElementById('semanticsShadowOutcomePanel');
+  if (!panel) return;
+  if (!payload || payload.available === false) {
+    panel.innerHTML = '<p class="muted">' + escapeHtml((payload && payload.summary) || 'No semantics shadow outcome review loaded yet.') + '</p>';
+    return;
+  }
+  const incumbent = payload.incumbent || {};
+  const challenger = payload.challenger || {};
+  const pairwise = payload.pairwise || {};
+  panel.innerHTML =
+    '<p><strong>Headline:</strong> ' + escapeHtml(payload.headline || '-') + '</p>' +
+    '<p><strong>Summary:</strong> ' + escapeHtml(payload.summary || '-') + '</p>' +
+    '<p><strong>Matured comparisons:</strong> ' + (payload.matured_comparisons ?? '-') + ' &nbsp;|&nbsp; <strong>Waiting:</strong> ' + (payload.waiting_for_maturity ?? '-') + ' &nbsp;|&nbsp; <strong>Pending resolution:</strong> ' + (payload.pending_resolution ?? '-') + '</p>' +
+    '<table><thead><tr><th>Engine</th><th>Visible Q-hit</th><th>Hidden Q-hit</th><th>Visible avg end ret</th><th>Visible avg MAE</th></tr></thead><tbody>' +
+      '<tr><td>Live legacy</td><td>' + fmtNum(incumbent.visible_quality_hit_rate, 3) + '</td><td>' + fmtNum(incumbent.hidden_quality_hit_rate, 3) + '</td><td>' + fmtNum(incumbent.visible_avg_end_ret, 4) + '</td><td>' + fmtNum(incumbent.visible_avg_mae, 4) + '</td></tr>' +
+      '<tr><td>Contract challenger</td><td>' + fmtNum(challenger.visible_quality_hit_rate, 3) + '</td><td>' + fmtNum(challenger.hidden_quality_hit_rate, 3) + '</td><td>' + fmtNum(challenger.visible_avg_end_ret, 4) + '</td><td>' + fmtNum(challenger.visible_avg_mae, 4) + '</td></tr>' +
+    '</tbody></table>' +
+    '<p><strong>Challenger quality win rate:</strong> ' + fmtPct(pairwise.challenger_quality_win_rate) + ' &nbsp;|&nbsp; <strong>Challenger end-ret win rate:</strong> ' + fmtPct(pairwise.challenger_end_ret_win_rate) + '</p>';
+}
+
+async function loadSemanticsShadowSummary(silent) {
+  const msg = document.getElementById('semanticsShadowMessage');
+  try {
+    const payload = await getJson('/api/semantics-shadow-comparison/summary');
+    renderSemanticsShadowSummary(payload);
+    if (msg && !silent) msg.textContent = payload.headline || 'Loaded semantics shadow summary.';
+  } catch (e) {
+    if (msg && !silent) msg.textContent = e.message;
+  }
+}
+
+async function loadSemanticsShadowOutcomeSummary(silent) {
+  const msg = document.getElementById('semanticsShadowMessage');
+  try {
+    const payload = await getJson('/api/semantics-shadow-outcome-review/summary');
+    renderSemanticsShadowOutcomeSummary(payload);
+    if (msg && !silent) msg.textContent = payload.headline || 'Loaded semantics shadow outcome review.';
+  } catch (e) {
+    if (msg && !silent) msg.textContent = e.message;
+  }
+}
+
+function downloadSemanticsShadowPack() {
+  window.location.href = '/api/semantics-shadow-comparison/latest-pack.zip';
+}
+
+function downloadSemanticsShadowOutcomePack() {
+  window.location.href = '/api/semantics-shadow-outcome-review/latest-pack.zip';
+}
+
 
 async function refreshAll() {
   attachSortHandlers();
@@ -3675,6 +3752,8 @@ async function refreshAll() {
     renderReviewRuns(runs);
     renderPolicyAudit(policy24, policy7d);
     loadShadowSelectionComparisonSummary(true);
+    loadSemanticsShadowSummary(true);
+    loadSemanticsShadowOutcomeSummary(true);
   } catch (e) {
     document.getElementById('scanBanner').textContent = 'Load failed: ' + e.message;
   }
@@ -3891,3 +3970,14 @@ if (loadSemanticsComparisonSummaryButton) loadSemanticsComparisonSummaryButton.a
 if (downloadSemanticsComparisonPackButton) downloadSemanticsComparisonPackButton.addEventListener('click', downloadSemanticsComparisonPack);
 if (downloadSemanticsComparisonPackQuickButton) downloadSemanticsComparisonPackQuickButton.addEventListener('click', downloadSemanticsComparisonPack);
 loadSemanticsComparisonSummary(true);
+const loadSemanticsShadowSummaryButton = document.getElementById('loadSemanticsShadowSummaryButton');
+const downloadSemanticsShadowPackButton = document.getElementById('downloadSemanticsShadowPackButton');
+const loadSemanticsShadowOutcomeSummaryButton = document.getElementById('loadSemanticsShadowOutcomeSummaryButton');
+const downloadSemanticsShadowOutcomePackButton = document.getElementById('downloadSemanticsShadowOutcomePackButton');
+if (loadSemanticsShadowSummaryButton) loadSemanticsShadowSummaryButton.addEventListener('click', function() { loadSemanticsShadowSummary(false); });
+if (downloadSemanticsShadowPackButton) downloadSemanticsShadowPackButton.addEventListener('click', downloadSemanticsShadowPack);
+if (loadSemanticsShadowOutcomeSummaryButton) loadSemanticsShadowOutcomeSummaryButton.addEventListener('click', function() { loadSemanticsShadowOutcomeSummary(false); });
+if (downloadSemanticsShadowOutcomePackButton) downloadSemanticsShadowOutcomePackButton.addEventListener('click', downloadSemanticsShadowOutcomePack);
+loadSemanticsComparisonSummary(true);
+loadSemanticsShadowSummary(true);
+loadSemanticsShadowOutcomeSummary(true);

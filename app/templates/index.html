@@ -65,6 +65,10 @@
       <a href="/api/reviews/raw-score-baseline/summary.txt"><button type="button">Download Raw Score Baseline TXT</button></a>
       <a href="/api/semantics-comparison/latest-summary.txt"><button type="button">Download Semantics Comparison TXT</button></a>
       <button id="downloadSemanticsComparisonPackQuickButton" type="button">Download Semantics Comparison Pack</button>
+      <a href="/api/semantics-shadow-comparison/summary.txt"><button type="button">Download Semantics Shadow Summary TXT</button></a>
+      <a href="/api/semantics-shadow-outcome-review/summary.txt"><button type="button">Download Semantics Shadow Outcome TXT</button></a>
+      <a href="/api/semantics-shadow-comparison/latest-pack.zip"><button type="button">Download Semantics Shadow Pack</button></a>
+      <a href="/api/semantics-shadow-outcome-review/latest-pack.zip"><button type="button">Download Semantics Shadow Outcome Pack</button></a>
       <a href="/api/reviews/post-maturity-bundle.zip"><button type="button">Download Post-Maturity Bundle</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary"><button type="button">Open Fresh Retrain Audit Summary JSON</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary.txt"><button type="button">Download Fresh Retrain Audit Summary TXT</button></a>
@@ -275,6 +279,24 @@
     <p class="small muted" style="margin-top:0;">This tranche is deliberately offline-only. It compares shortlist semantics around the existing ranking before any live threshold or Stage 1 change.</p>
     <div id="semanticsComparisonMessage" class="muted" style="margin-bottom:10px;"></div>
     <div id="semanticsComparisonPanel"><p class="muted">No semantics comparison summary loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Semantics Shadow Proof</h2>
+  <div class="card">
+    <p class="muted">Evidence-only live shadow for the contract-aligned semantics challenger. The live legacy shortlist remains unchanged while the challenger is measured on the same completed scans.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <button id="loadSemanticsShadowSummaryButton" type="button">Load Semantics Shadow Summary</button>
+      <button id="downloadSemanticsShadowPackButton" type="button">Download Semantics Shadow Pack</button>
+      <a href="/api/semantics-shadow-comparison/summary.txt"><button type="button">Download Semantics Shadow TXT</button></a>
+      <button id="loadSemanticsShadowOutcomeSummaryButton" type="button">Load Shadow Outcome Review</button>
+      <button id="downloadSemanticsShadowOutcomePackButton" type="button">Download Shadow Outcome Pack</button>
+      <a href="/api/semantics-shadow-outcome-review/summary.txt"><button type="button">Download Shadow Outcome TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">This tranche does not change the live shortlist. It only records whether the contract-aligned semantics challenger survives a real resolved proof window on the same scans.</p>
+    <div id="semanticsShadowMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="semanticsShadowPanel"><p class="muted">No semantics shadow summary loaded yet.</p></div>
+    <div id="semanticsShadowOutcomePanel" style="margin-top:12px;"><p class="muted">No semantics shadow outcome review loaded yet.</p></div>
   </div>
 
 

@@ -34,6 +34,8 @@ from .utility_selection_lab import UtilitySelectionLabService
 from .utility_policy_search_lab import UtilityPolicySearchLabService
 from .shadow_selection_comparison import ShadowSelectionComparisonService
 from .shadow_selection_outcome_review import ShadowSelectionOutcomeReviewService
+from .semantics_shadow_comparison import SemanticsShadowComparisonService
+from .semantics_shadow_outcome_review import SemanticsShadowOutcomeReviewService
 from .utility_tuning_lab import UtilityTuningLabService
 from .utility_model_lab import UtilityModelLabService
 from .utility_model_proof import UtilityModelProofService
@@ -84,6 +86,9 @@ shadow_selection_comparison = ShadowSelectionComparisonService(config, review_pa
 scanner = ScannerService(config, state, client, paper_trade=paper_trade, review_packs=review_packs, shadow_selection_comparison_service=shadow_selection_comparison)
 trainer = TrainingService(config, state, client)
 replay = HistoricalReplayService(config, client, scanner, review_packs)
+semantics_comparison = SemanticsComparisonService(config, replay, review_packs)
+semantics_shadow_comparison = SemanticsShadowComparisonService(config, review_packs, semantics_comparison)
+scanner.semantics_shadow_comparison_service = semantics_shadow_comparison
 stage1_opportunity = Stage1OpportunityService(config)
 scanner.stage1_opportunity = stage1_opportunity
 model_output_distribution = ModelOutputDistributionService(config)
@@ -99,6 +104,7 @@ historical_decision_lab = HistoricalDecisionLabService(config, replay, benchmark
 utility_selection_lab = UtilitySelectionLabService(config, replay, review_packs)
 utility_policy_search_lab = UtilityPolicySearchLabService(config, replay, review_packs)
 shadow_selection_outcome_review = ShadowSelectionOutcomeReviewService(config, review_packs, shadow_selection_comparison, utility_policy_search_lab)
+semantics_shadow_outcome_review = SemanticsShadowOutcomeReviewService(config, review_packs, semantics_shadow_comparison)
 utility_tuning_lab = UtilityTuningLabService(config, replay, review_packs)
 utility_model_lab = UtilityModelLabService(config, client)
 utility_model_proof = UtilityModelProofService(config, review_packs)
@@ -154,7 +160,6 @@ control_ledger = ControlLedgerService(
     app_name="Coinbase Crypto Prob Scanner",
     objective="Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
 )
-semantics_comparison = SemanticsComparisonService(config, replay, review_packs)
 
 
 def _dict_to_text(payload: dict) -> str:
@@ -1200,6 +1205,48 @@ def api_shadow_selection_outcome_review_pack():
     pack = shadow_selection_outcome_review.latest_pack()
     if pack is None:
         raise HTTPException(status_code=404, detail="No shadow selection outcome review pack available yet")
+    return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
+
+
+@app.get("/api/semantics-shadow-comparison/summary")
+def api_semantics_shadow_comparison_summary():
+    return semantics_shadow_comparison.latest_summary()
+
+
+@app.get("/api/semantics-shadow-comparison/summary.txt")
+def api_semantics_shadow_comparison_summary_txt():
+    payload = semantics_shadow_comparison.latest_summary()
+    generated = str(payload.get("generated_at_utc") or payload.get("updated_at_utc") or "latest").replace(":", "").replace("-", "")
+    filename = f"semantics_shadow_comparison_summary_{generated}.txt"
+    return PlainTextResponse(_dict_to_text(payload), headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/semantics-shadow-comparison/latest-pack.zip")
+def api_semantics_shadow_comparison_pack():
+    pack = semantics_shadow_comparison.latest_pack()
+    if pack is None:
+        raise HTTPException(status_code=404, detail="No semantics shadow comparison pack available yet")
+    return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
+
+
+@app.get("/api/semantics-shadow-outcome-review/summary")
+def api_semantics_shadow_outcome_review_summary():
+    return semantics_shadow_outcome_review.latest_summary()
+
+
+@app.get("/api/semantics-shadow-outcome-review/summary.txt")
+def api_semantics_shadow_outcome_review_summary_txt():
+    payload = semantics_shadow_outcome_review.latest_summary()
+    generated = str(payload.get("generated_at_utc") or "latest").replace(":", "").replace("-", "")
+    filename = f"semantics_shadow_outcome_review_summary_{generated}.txt"
+    return PlainTextResponse(_dict_to_text(payload), headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/semantics-shadow-outcome-review/latest-pack.zip")
+def api_semantics_shadow_outcome_review_pack():
+    pack = semantics_shadow_outcome_review.latest_pack()
+    if pack is None:
+        raise HTTPException(status_code=404, detail="No semantics shadow outcome review pack available yet")
     return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
 
 

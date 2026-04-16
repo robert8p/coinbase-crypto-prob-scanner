@@ -138,6 +138,8 @@ class ControlLedgerService:
             "latest_post_maturity_bundle": Path(self.config.model_dir) / "reviews" / "latest_post_maturity_review_bundle.zip",
             "latest_replay_pack": replay_dir / "latest_replay_pack.zip",
             "latest_semantics_comparison_pack": Path(self.config.model_dir) / "semantics_comparison" / "latest_semantics_comparison_pack.zip",
+            "latest_semantics_shadow_comparison_pack": Path(self.config.model_dir) / "semantics_shadow_comparison" / "latest_semantics_shadow_comparison_pack.zip",
+            "latest_semantics_shadow_outcome_review_pack": Path(self.config.model_dir) / "semantics_shadow_outcome_review" / "latest_semantics_shadow_outcome_review_pack.zip",
             "model_bundle_pt2": Path(self.config.model_path_pt2),
         }
         out: dict[str, dict[str, Any]] = {}
@@ -180,6 +182,12 @@ class ControlLedgerService:
             "semantics_comparison_summary_json": "/api/semantics-comparison/latest-summary",
             "semantics_comparison_summary_txt": "/api/semantics-comparison/latest-summary.txt",
             "semantics_comparison_pack_zip": "/api/semantics-comparison/latest-pack.zip",
+            "semantics_shadow_comparison_summary_json": "/api/semantics-shadow-comparison/summary",
+            "semantics_shadow_comparison_summary_txt": "/api/semantics-shadow-comparison/summary.txt",
+            "semantics_shadow_comparison_pack_zip": "/api/semantics-shadow-comparison/latest-pack.zip",
+            "semantics_shadow_outcome_review_summary_json": "/api/semantics-shadow-outcome-review/summary",
+            "semantics_shadow_outcome_review_summary_txt": "/api/semantics-shadow-outcome-review/summary.txt",
+            "semantics_shadow_outcome_review_pack_zip": "/api/semantics-shadow-outcome-review/latest-pack.zip",
         }
         payload = {
             "generated_at_utc": self._now(),

@@ -47,13 +47,14 @@ class ScanArtifacts:
 
 
 class ScannerService:
-    def __init__(self, config: AppConfig, state: AppState, client: CoinbaseClient, paper_trade: PaperTradeService | None = None, review_packs: ReviewPackService | None = None, shadow_selection_comparison_service: Any | None = None):
+    def __init__(self, config: AppConfig, state: AppState, client: CoinbaseClient, paper_trade: PaperTradeService | None = None, review_packs: ReviewPackService | None = None, shadow_selection_comparison_service: Any | None = None, semantics_shadow_comparison_service: Any | None = None):
         self.config = config
         self.state = state
         self.client = client
         self.paper_trade = paper_trade
         self.review_packs = review_packs
         self.shadow_selection_comparison_service = shadow_selection_comparison_service
+        self.semantics_shadow_comparison_service = semantics_shadow_comparison_service
         self.model_output_distribution_service = None
         self.binance = BinanceClient(timeout=config.http_timeout_seconds, pause=config.request_pause_seconds)
         self._scheduler_thread: threading.Thread | None = None
@@ -2825,6 +2826,19 @@ class ScannerService:
                     self.state.update_status(shadow_selection_comparison=shadow_summary)
                 except Exception as exc:
                     logger.warning("shadow_selection_comparison_record_failed trigger=%s error=%s", trigger, exc)
+            if self.semantics_shadow_comparison_service is not None:
+                try:
+                    current_status = self.state.get_status()
+                    semantics_shadow_summary = self.semantics_shadow_comparison_service.record_scan(
+                        status=current_status,
+                        live_rows=artifacts.scores,
+                        trimmed_visible_rows=artifacts.trimmed_visible_rows,
+                        suppressed_rows=artifacts.suppressed_rows,
+                        trigger_source=trigger,
+                    )
+                    self.state.update_status(semantics_shadow_comparison=semantics_shadow_summary)
+                except Exception as exc:
+                    logger.warning("semantics_shadow_comparison_record_failed trigger=%s error=%s", trigger, exc)
             logger.info("scan_complete trigger=%s scored=%s", trigger, len(artifacts.scores))
         except Exception as exc:
             logger.exception("scan_failed trigger=%s error=%s", trigger, exc)
