@@ -123,7 +123,7 @@ class SemanticsComparisonService:
             stage1_selection_mode=getattr(self.config, "stage1_selection_mode", None),
         ) or {}
 
-        current_rows = self.replay._execute_replay_window(  # noqa: SLF001 - deliberate internal reuse for like-for-like frame
+        current_window = self.replay._execute_replay_window(  # noqa: SLF001 - deliberate internal reuse for like-for-like frame
             timestamps=shared["timestamps"],
             selected_for_fetch=shared["selected_for_fetch"],
             universe=shared["universe"],
@@ -134,9 +134,9 @@ class SemanticsComparisonService:
             stage1_selection_mode_override=None,
             stage1_max_candidates_override=None,
             capture_full_rankable_rows=False,
-        )["rows"]
+        )
 
-        widening_rows = self.replay._execute_replay_window(  # noqa: SLF001 - deliberate internal reuse for like-for-like frame
+        widening_window = self.replay._execute_replay_window(  # noqa: SLF001 - deliberate internal reuse for like-for-like frame
             timestamps=shared["timestamps"],
             selected_for_fetch=shared["selected_for_fetch"],
             universe=shared["universe"],
@@ -147,7 +147,10 @@ class SemanticsComparisonService:
             stage1_selection_mode_override=None,
             stage1_max_candidates_override=None,
             capture_full_rankable_rows=False,
-        )["rows"]
+        )
+
+        current_rows = list((current_window or {}).get("replay_rows") or [])
+        widening_rows = list((widening_window or {}).get("replay_rows") or [])
 
         current_path_rows = self._normalize_replay_rows(current_rows, path_name="current_035_path")
         widening_path_rows = self._normalize_replay_rows(widening_rows, path_name="widening_028_reference_path")

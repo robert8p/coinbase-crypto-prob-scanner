@@ -1,0 +1,12 @@
+Coinbase Crypto Prob Scanner v4.20.8
+
+Hotfix for the offline/replay semantics comparison tranche.
+
+What changed
+- Fixed the semantics comparison runner to read replay rows from HistoricalReplayService._execute_replay_window correctly.
+- Added API error surfacing so failures return a readable 400 detail instead of a generic 500 where possible.
+- Fixed semantics comparison pack download buttons to include the entered admin password as a query string, avoiding an unauthenticated download path.
+
+Why
+- v4.20.7 could raise an internal server error when running the semantics comparison because it looked for a non-existent "rows" key instead of "replay_rows" in the replay window result.
+- The visible pack download path could also fail when clicked without an admin query parameter.

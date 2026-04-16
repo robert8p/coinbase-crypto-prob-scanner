@@ -1,9 +1,9 @@
 {
   "app_name": "Coinbase Crypto Prob Scanner",
-  "app_version": "4.20.7",
+  "app_version": "4.20.8",
   "release_type": "offline_semantics_comparison",
-  "tranche_title": "Offline/replay score-semantics recalibration around the existing ranking",
-  "tranche_goal": "Compare the exact current 0.35 path, a contract-aligned recalibrated shortlist semantics path, and a 0.28 widening reference path on one shared replay frame before any live policy change.",
+  "tranche_title": "Semantics comparison execution hotfix",
+  "tranche_goal": "Fix the broken semantics comparison run path so the offline comparator executes, and make pack download use the entered admin password instead of an unauthenticated link.",
   "objective": "Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
   "new_endpoints": [
     "/api/semantics-comparison/run",

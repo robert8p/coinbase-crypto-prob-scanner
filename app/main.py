@@ -886,7 +886,12 @@ def api_semantics_comparison_run(
     max_symbols: int = Query(default=100, ge=1, le=500),
     _=Depends(require_admin),
 ):
-    return semantics_comparison.run(hours=hours, step_minutes=step_minutes, max_scans=max_scans, max_symbols=max_symbols)
+    try:
+        return semantics_comparison.run(hours=hours, step_minutes=step_minutes, max_scans=max_scans, max_symbols=max_symbols)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.get("/api/semantics-comparison/latest-summary")

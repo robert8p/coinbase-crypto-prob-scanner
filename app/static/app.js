@@ -3603,6 +3603,13 @@ function renderSemanticsComparisonSummary(payload) {
     '<ul>' + (effects || '<li class="muted">No obvious effects recorded yet.</li>') + '</ul>';
 }
 
+function semanticsComparisonPackUrl() {
+  const pw = (document.getElementById('semanticsComparisonAdminPassword') || {}).value || '';
+  const url = new URL('/api/semantics-comparison/latest-pack.zip', window.location.origin);
+  if (pw) url.searchParams.set('admin_password', pw);
+  return url.pathname + url.search;
+}
+
 async function runSemanticsComparison() {
   const pw = (document.getElementById('semanticsComparisonAdminPassword') || {}).value || '';
   const hours = Number((document.getElementById('semanticsComparisonHours') || {}).value || 168);
@@ -3638,8 +3645,9 @@ async function loadSemanticsComparisonSummary(silent) {
 }
 
 function downloadSemanticsComparisonPack() {
-  window.location.href = '/api/semantics-comparison/latest-pack.zip';
+  window.location.href = semanticsComparisonPackUrl();
 }
+
 
 async function refreshAll() {
   attachSortHandlers();
@@ -3877,7 +3885,9 @@ if (decisionBranchAckButton) decisionBranchAckButton.addEventListener('click', a
 const runSemanticsComparisonButton = document.getElementById('runSemanticsComparisonButton');
 const loadSemanticsComparisonSummaryButton = document.getElementById('loadSemanticsComparisonSummaryButton');
 const downloadSemanticsComparisonPackButton = document.getElementById('downloadSemanticsComparisonPackButton');
+const downloadSemanticsComparisonPackQuickButton = document.getElementById('downloadSemanticsComparisonPackQuickButton');
 if (runSemanticsComparisonButton) runSemanticsComparisonButton.addEventListener('click', runSemanticsComparison);
 if (loadSemanticsComparisonSummaryButton) loadSemanticsComparisonSummaryButton.addEventListener('click', function() { loadSemanticsComparisonSummary(false); });
 if (downloadSemanticsComparisonPackButton) downloadSemanticsComparisonPackButton.addEventListener('click', downloadSemanticsComparisonPack);
+if (downloadSemanticsComparisonPackQuickButton) downloadSemanticsComparisonPackQuickButton.addEventListener('click', downloadSemanticsComparisonPack);
 loadSemanticsComparisonSummary(true);
