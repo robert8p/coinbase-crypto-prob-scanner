@@ -140,6 +140,7 @@ class ControlLedgerService:
             "latest_semantics_comparison_pack": Path(self.config.model_dir) / "semantics_comparison" / "latest_semantics_comparison_pack.zip",
             "latest_semantics_shadow_comparison_pack": Path(self.config.model_dir) / "semantics_shadow_comparison" / "latest_semantics_shadow_comparison_pack.zip",
             "latest_semantics_shadow_outcome_review_pack": Path(self.config.model_dir) / "semantics_shadow_outcome_review" / "latest_semantics_shadow_outcome_review_pack.zip",
+            "latest_semantics_promotion_review_pack": Path(self.config.model_dir) / "semantics_promotion_review" / "latest_semantics_promotion_review_pack.zip",
             "model_bundle_pt2": Path(self.config.model_path_pt2),
         }
         out: dict[str, dict[str, Any]] = {}
@@ -188,6 +189,9 @@ class ControlLedgerService:
             "semantics_shadow_outcome_review_summary_json": "/api/semantics-shadow-outcome-review/summary",
             "semantics_shadow_outcome_review_summary_txt": "/api/semantics-shadow-outcome-review/summary.txt",
             "semantics_shadow_outcome_review_pack_zip": "/api/semantics-shadow-outcome-review/latest-pack.zip",
+            "semantics_promotion_review_summary_json": "/api/semantics-promotion-review/summary",
+            "semantics_promotion_review_summary_txt": "/api/semantics-promotion-review/summary.txt",
+            "semantics_promotion_review_pack_zip": "/api/semantics-promotion-review/latest-pack.zip",
         }
         payload = {
             "generated_at_utc": self._now(),

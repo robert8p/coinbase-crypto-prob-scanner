@@ -12,16 +12,13 @@ from typing import Any, Iterable
 
 from .config import AppConfig
 from .modeling import ModelBundle
-from .objective_semantics import load_objective_semantics_contract
+from .objective_semantics import load_objective_semantics_contract, select_contract_aligned_rows, VISIBLE_OBJECTIVE_BANDS, STRONGER_OBJECTIVE_BANDS
 from .persist import atomic_write_json, ensure_dir, read_json
 from .review_runs import ReviewPackService
 from .replay import HistoricalReplayService
 from .universe import UniverseBuilder
 from .version import APP_VERSION
 
-
-VISIBLE_OBJECTIVE_BANDS = {"confirmed_shortlist", "strong_edge", "priority_edge", "elite_edge"}
-STRONGER_OBJECTIVE_BANDS = {"strong_edge", "priority_edge", "elite_edge"}
 
 
 def _utc_now_iso() -> str:
@@ -397,39 +394,7 @@ class SemanticsComparisonService:
         return out
 
     def _select_contract_rows(self, ordered: list[dict], *, contract: dict) -> list[tuple[dict, str]]:
-        strong_floor = _f(contract.get("strong_edge_floor"))
-        confirmed_floor = _f(contract.get("confirmed_shortlist_floor"), _f(getattr(self.config, "live_raw_threshold", 0.35), 0.35)) or 0.35
-        top_cap = min(
-            5,
-            max(1, int(getattr(self.config, "stage2_decision_focus_top_n", 5) or 5)),
-            max(1, int(getattr(self.config, "utility_shortlist_target_max_names", 8) or 8)),
-        )
-        strong_rows: list[tuple[dict, str]] = []
-        for row in ordered:
-            band = str(row.get("objective_score_band") or "")
-            live_score = _f(row.get("live_score"), 0.0) or 0.0
-            if band in STRONGER_OBJECTIVE_BANDS:
-                strong_rows.append((row, f"contract_{band}"))
-                continue
-            if strong_floor is not None and live_score >= strong_floor:
-                strong_rows.append((row, "contract_strong_floor"))
-        if strong_rows:
-            return strong_rows[:top_cap]
-
-        fallback_gap = 0.015
-        fallback: list[tuple[dict, str]] = []
-        for row in ordered:
-            band = str(row.get("objective_score_band") or "")
-            live_score = _f(row.get("live_score"), 0.0) or 0.0
-            if band not in VISIBLE_OBJECTIVE_BANDS:
-                continue
-            if live_score < confirmed_floor:
-                continue
-            if strong_floor is not None and live_score < strong_floor - fallback_gap:
-                continue
-            fallback.append((row, "contract_near_strong_fallback"))
-            break
-        return fallback
+        return select_contract_aligned_rows(ordered, contract=contract, config=self.config)
 
     def _group_by_scan(self, rows: list[dict]) -> dict[str, list[dict]]:
         grouped: dict[str, list[dict]] = defaultdict(list)

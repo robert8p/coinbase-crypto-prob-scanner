@@ -66,7 +66,7 @@ services:
       - key: LIVE_RAW_THRESHOLD
         value: 0.35
       - key: LIVE_SELECTION_MODE
-        value: legacy
+        value: contract_aligned
       - key: UTILITY_SHORTLIST_TARGET_MAX_NAMES
         value: 8
       - key: UTILITY_SHORTLIST_SCORE_FLOOR

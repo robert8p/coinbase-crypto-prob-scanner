@@ -32,7 +32,7 @@ from .universe import UniverseBuilder
 logger = logging.getLogger(__name__)
 
 from .version import APP_VERSION
-from .objective_semantics import load_objective_semantics_contract, score_objective_band
+from .objective_semantics import load_objective_semantics_contract, score_objective_band, select_contract_aligned_rows, contract_aligned_top_cap
 
 
 @dataclass(slots=True)
@@ -2104,7 +2104,8 @@ class ScannerService:
     def _limit_visible_shortlist(self, rows: List[dict], *, effective_max: int, tracked_priority_symbols: List[str] | None = None) -> tuple[List[dict], List[dict], dict]:
         rows = list(rows or [])
         effective_max = max(0, int(effective_max or 0))
-        if str(getattr(self.config, "live_selection_mode", "utility_constrained") or "utility_constrained").lower() == "utility_constrained":
+        live_selection_mode = str(getattr(self.config, "live_selection_mode", "legacy") or "legacy").lower() or "legacy"
+        if live_selection_mode == "utility_constrained":
             utility_tuning_override = load_active_utility_tuning_override(self.config.model_dir)
             override_source = str((utility_tuning_override or {}).get('source') or '')
             if utility_tuning_override:
@@ -2162,6 +2163,9 @@ class ScannerService:
             utility_config = utility_config_with_runtime_override(self.config, utility_tuning_override)
             result = optimize_visible_shortlist(rows, effective_max=effective_max, config=utility_config, tracked_priority_symbols=tracked_priority_symbols)
             return result.visible_rows, result.trimmed_rows, result.meta
+
+        if live_selection_mode == "contract_aligned":
+            return self._limit_visible_shortlist_contract(rows, effective_max=effective_max, tracked_priority_symbols=tracked_priority_symbols)
 
         tracked_set = {str(s) for s in (tracked_priority_symbols or []) if str(s)}
         pin_cap = max(0, int(getattr(self.config, "cooldown_followup_visible_pin_count", 5) or 5))
@@ -2230,6 +2234,100 @@ class ScannerService:
             "tracked_visible_symbols": [r.get("symbol") for r in tracked_visible if r.get("symbol")],
             "symbol_concentration_cap": {"max_share": max_symbol_share, "absolute_cap": absolute_symbol_cap},
             "symbol_concentration_trimmed": len(concentration_trimmed),
+        }
+        return visible, trimmed, meta
+
+
+    def _limit_visible_shortlist_contract(self, rows: List[dict], *, effective_max: int, tracked_priority_symbols: List[str] | None = None) -> tuple[List[dict], List[dict], dict]:
+        rows = list(rows or [])
+        effective_max = max(0, int(effective_max or 0))
+        contract = load_objective_semantics_contract(
+            self.config.model_dir,
+            live_threshold=float(getattr(self.config, "live_raw_threshold", 0.35) or 0.35),
+            stage1_selection_mode=getattr(self.config, "stage1_selection_mode", None),
+        ) or {}
+        if not contract or effective_max <= 0:
+            visible = [] if effective_max <= 0 else list(rows[:effective_max])
+            visible_ids = {id(r) for r in visible}
+            trimmed = [dict(r) for r in rows if id(r) not in visible_ids]
+            for item in trimmed:
+                item.setdefault("suppression_reason", "display_trim")
+                item.setdefault("suppression_reason_detail", "contract-aligned shortlist could not be applied cleanly, so the row was not shown in the visible shortlist")
+            meta = {
+                "selection_engine": "contract_aligned" if contract else "contract_aligned_fallback",
+                "contract_semantics_active": bool(contract),
+                "contract_available": bool(contract),
+                "contract_top_cap_applied": 0 if effective_max <= 0 else min(effective_max, len(visible)),
+                "contract_fallback_used": False,
+                "tracked_visible_promoted": 0,
+                "tracked_visible_symbols": [],
+            }
+            return visible, trimmed, meta
+
+        selected = select_contract_aligned_rows(
+            rows,
+            contract=contract,
+            config=self.config,
+            explicit_cap=min(effective_max, contract_aligned_top_cap(self.config)),
+        )
+        selected_ids = {id(row): reason for row, reason in selected}
+        visible: List[dict] = []
+        trimmed: List[dict] = []
+        visible_rank = 0
+        tracked_set = {str(s) for s in (tracked_priority_symbols or []) if str(s)}
+        tracked_visible_symbols: List[str] = []
+        fallback_used = False
+        for row in rows:
+            reason = selected_ids.get(id(row))
+            if reason is not None:
+                item = dict(row)
+                visible_rank += 1
+                item["score_rank"] = visible_rank
+                item["selection_semantics"] = "contract_aligned"
+                item["selection_engine"] = "contract_aligned"
+                item["selection_reason"] = reason
+                item["tracked_followup_visible"] = bool(item.get("tracked_followup_symbol"))
+                if item["tracked_followup_visible"] and item.get("symbol"):
+                    tracked_visible_symbols.append(str(item.get("symbol")))
+                if reason == "contract_near_strong_fallback":
+                    fallback_used = True
+                visible.append(item)
+                continue
+            hidden = dict(row)
+            hidden.setdefault("suppression_reason", "display_trim")
+            band = str(hidden.get("objective_score_band") or "")
+            if band in {"strong_edge", "priority_edge", "elite_edge"}:
+                detail = "trimmed because the contract-aligned shortlist keeps only the strongest ranked rows in the objective edge bands"
+            elif band in {"confirmed_shortlist"}:
+                detail = "trimmed because the contract-aligned shortlist keeps strong-edge rows first and only uses a narrow fallback when no strong-edge row exists"
+            else:
+                detail = "trimmed because the contract-aligned shortlist only surfaces strong-edge rows or a narrow near-strong fallback"
+            hidden["suppression_reason_detail"] = detail
+            hidden["selection_semantics"] = "contract_aligned"
+            hidden["selection_engine"] = "contract_aligned"
+            trimmed.append(hidden)
+
+        meta = {
+            "selection_engine": "contract_aligned",
+            "contract_semantics_active": True,
+            "contract_available": True,
+            "contract_top_cap_applied": min(effective_max, contract_aligned_top_cap(self.config)),
+            "contract_fallback_used": fallback_used,
+            "contract_confirmed_shortlist_floor": contract.get("confirmed_shortlist_floor"),
+            "contract_strong_edge_floor": contract.get("strong_edge_floor"),
+            "contract_priority_edge_floor": contract.get("priority_edge_floor"),
+            "contract_elite_edge_floor": contract.get("elite_edge_floor"),
+            "tracked_visible_promoted": len(tracked_visible_symbols),
+            "tracked_visible_symbols": tracked_visible_symbols,
+            "watchlist_cap_applied": None,
+            "watchlist_visible": 0,
+            "watchlist_trimmed": 0,
+            "action_selective_visible": len(visible),
+            "near_watchlist_visible": 0,
+            "exploratory_watchlist_visible": 0,
+            "exploratory_watchlist_cap_applied": None,
+            "symbol_concentration_cap": None,
+            "symbol_concentration_trimmed": 0,
         }
         return visible, trimmed, meta
 

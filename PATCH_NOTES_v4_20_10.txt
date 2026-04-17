@@ -1,0 +1,16 @@
+Coinbase Crypto Prob Scanner v4.20.10
+
+Tranche
+- Promote the contract-aligned semantics challenger into the live visible-shortlist layer.
+
+What changed
+- LIVE_SELECTION_MODE is now contract_aligned in render.yaml.
+- The scanner now applies the proven contract-aligned shortlist semantics only at the final visible-shortlist layer.
+- Raw ranking, Stage 1 mode, LIVE_RAW_THRESHOLD, model bundle, and universe settings stay unchanged.
+- Added a semantics promotion review summary/pack so the promoted path can be judged against the confirmed 4.20.9 legacy baseline with a simple rollback recommendation.
+
+Guardrails
+- No Stage 1 change.
+- No threshold change.
+- No model retrain or model swap.
+- No universe change.

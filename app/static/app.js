@@ -3726,6 +3726,48 @@ function downloadSemanticsShadowOutcomePack() {
 }
 
 
+
+function renderSemanticsPromotionReview(payload) {
+  const panel = document.getElementById('semanticsPromotionReviewPanel');
+  if (!panel) return;
+  if (!payload || payload.available === false) {
+    panel.innerHTML = '<p class="muted">' + escapeHtml((payload && payload.summary) || 'No semantics promotion review loaded yet.') + '</p>';
+    return;
+  }
+  const baseline = payload.baseline_legacy_reference || {};
+  const current = payload.current_promoted_evidence || {};
+  const deltas = payload.deltas_vs_legacy_baseline || {};
+  const under = (payload.underperforming_dimensions || []).map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('');
+  panel.innerHTML =
+    '<p><strong>Headline:</strong> ' + escapeHtml(payload.headline || '-') + '</p>' +
+    '<p><strong>Summary:</strong> ' + escapeHtml(payload.summary || '-') + '</p>' +
+    '<p><strong>Verdict:</strong> ' + escapeHtml(payload.verdict || '-') + '</p>' +
+    '<p><strong>Recommended action:</strong> ' + escapeHtml(payload.recommended_action || '-') + '</p>' +
+    '<table><thead><tr><th>Metric</th><th>4.20.9 legacy baseline</th><th>Current promoted version</th><th>Delta</th></tr></thead><tbody>' +
+      '<tr><td>Visible quality hit rate</td><td>' + fmtNum(baseline.visible_quality_hit_rate, 4) + '</td><td>' + fmtNum(current.visible_quality_hit_rate, 4) + '</td><td>' + fmtNum(deltas.visible_quality_hit_rate_delta, 4) + '</td></tr>' +
+      '<tr><td>Visible-vs-hidden quality gap</td><td>' + fmtNum(baseline.visible_hidden_quality_gap, 4) + '</td><td>' + fmtNum(current.visible_hidden_quality_gap, 4) + '</td><td>' + fmtNum(deltas.visible_hidden_quality_gap_delta, 4) + '</td></tr>' +
+      '<tr><td>Visible avg end ret</td><td>' + fmtNum(baseline.visible_avg_end_ret, 4) + '</td><td>' + fmtNum(current.visible_avg_end_ret, 4) + '</td><td>' + fmtNum(deltas.visible_avg_end_ret_delta, 4) + '</td></tr>' +
+    '</tbody></table>' +
+    '<p><strong>Resolved visible rows:</strong> ' + (current.visible_rows ?? '-') + ' &nbsp;|&nbsp; <strong>Minimum for guardrail:</strong> ' + (payload.minimum_visible_rows_for_guardrail ?? '-') + '</p>' +
+    '<h3 style="margin-top:16px;">Underperforming dimensions</h3>' +
+    '<ul>' + (under || '<li class="muted">None recorded.</li>') + '</ul>';
+}
+
+async function loadSemanticsPromotionReview(silent) {
+  const msg = document.getElementById('semanticsPromotionReviewMessage');
+  try {
+    const payload = await getJson('/api/semantics-promotion-review/summary');
+    renderSemanticsPromotionReview(payload);
+    if (msg && !silent) msg.textContent = payload.headline || 'Loaded semantics promotion review.';
+  } catch (e) {
+    if (msg && !silent) msg.textContent = e.message;
+  }
+}
+
+function downloadSemanticsPromotionReviewPack() {
+  window.location.href = '/api/semantics-promotion-review/latest-pack.zip';
+}
+
 async function refreshAll() {
   attachSortHandlers();
   try {
@@ -3754,6 +3796,7 @@ async function refreshAll() {
     loadShadowSelectionComparisonSummary(true);
     loadSemanticsShadowSummary(true);
     loadSemanticsShadowOutcomeSummary(true);
+    loadSemanticsPromotionReview(true);
   } catch (e) {
     document.getElementById('scanBanner').textContent = 'Load failed: ' + e.message;
   }
@@ -3970,6 +4013,10 @@ if (loadSemanticsComparisonSummaryButton) loadSemanticsComparisonSummaryButton.a
 if (downloadSemanticsComparisonPackButton) downloadSemanticsComparisonPackButton.addEventListener('click', downloadSemanticsComparisonPack);
 if (downloadSemanticsComparisonPackQuickButton) downloadSemanticsComparisonPackQuickButton.addEventListener('click', downloadSemanticsComparisonPack);
 loadSemanticsComparisonSummary(true);
+const loadSemanticsPromotionReviewButton = document.getElementById('loadSemanticsPromotionReviewButton');
+const downloadSemanticsPromotionReviewPackButton = document.getElementById('downloadSemanticsPromotionReviewPackButton');
+if (loadSemanticsPromotionReviewButton) loadSemanticsPromotionReviewButton.addEventListener('click', function() { loadSemanticsPromotionReview(false); });
+if (downloadSemanticsPromotionReviewPackButton) downloadSemanticsPromotionReviewPackButton.addEventListener('click', downloadSemanticsPromotionReviewPack);
 const loadSemanticsShadowSummaryButton = document.getElementById('loadSemanticsShadowSummaryButton');
 const downloadSemanticsShadowPackButton = document.getElementById('downloadSemanticsShadowPackButton');
 const loadSemanticsShadowOutcomeSummaryButton = document.getElementById('loadSemanticsShadowOutcomeSummaryButton');
@@ -3981,3 +4028,4 @@ if (downloadSemanticsShadowOutcomePackButton) downloadSemanticsShadowOutcomePack
 loadSemanticsComparisonSummary(true);
 loadSemanticsShadowSummary(true);
 loadSemanticsShadowOutcomeSummary(true);
+loadSemanticsPromotionReview(true);

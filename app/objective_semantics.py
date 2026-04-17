@@ -116,6 +116,69 @@ def load_objective_semantics_contract(
     }
 
 
+
+
+VISIBLE_OBJECTIVE_BANDS = {"confirmed_shortlist", "strong_edge", "priority_edge", "elite_edge"}
+STRONGER_OBJECTIVE_BANDS = {"strong_edge", "priority_edge", "elite_edge"}
+
+
+def contract_aligned_top_cap(config: Any | None = None, *, explicit_cap: int | None = None) -> int:
+    if explicit_cap is not None:
+        try:
+            return max(1, int(explicit_cap))
+        except Exception:
+            pass
+    top_cap = 5
+    if config is not None:
+        for attr in ("stage2_decision_focus_top_n", "utility_shortlist_target_max_names"):
+            try:
+                value = int(getattr(config, attr, top_cap) or top_cap)
+                top_cap = min(top_cap, max(1, value))
+            except Exception:
+                continue
+    return max(1, int(top_cap))
+
+
+def select_contract_aligned_rows(
+    ordered_rows: list[dict],
+    *,
+    contract: dict | None,
+    config: Any | None = None,
+    explicit_cap: int | None = None,
+    fallback_gap: float = 0.015,
+) -> list[tuple[dict, str]]:
+    contract = dict(contract or {})
+    strong_floor = _f(contract.get("strong_edge_floor"))
+    confirmed_floor = _f(contract.get("confirmed_shortlist_floor"))
+    top_cap = contract_aligned_top_cap(config, explicit_cap=explicit_cap)
+
+    strong_rows: list[tuple[dict, str]] = []
+    for row in list(ordered_rows or []):
+        band = str(row.get("objective_score_band") or "")
+        live_score = _f(row.get("live_score")) or 0.0
+        if band in STRONGER_OBJECTIVE_BANDS:
+            strong_rows.append((row, f"contract_{band}"))
+            continue
+        if strong_floor is not None and live_score >= strong_floor:
+            strong_rows.append((row, "contract_strong_floor"))
+    if strong_rows:
+        return strong_rows[:top_cap]
+
+    fallback: list[tuple[dict, str]] = []
+    for row in list(ordered_rows or []):
+        band = str(row.get("objective_score_band") or "")
+        live_score = _f(row.get("live_score")) or 0.0
+        if band not in VISIBLE_OBJECTIVE_BANDS:
+            continue
+        if confirmed_floor is not None and live_score < confirmed_floor:
+            continue
+        if strong_floor is not None and live_score < strong_floor - float(fallback_gap or 0.015):
+            continue
+        fallback.append((row, "contract_near_strong_fallback"))
+        break
+    return fallback
+
+
 def score_objective_band(*, live_score: float, contract: dict | None, near_gap: float = 0.08) -> dict:
     contract = dict(contract or {})
     score = float(live_score or 0.0)

@@ -1,47 +1,69 @@
 {
   "app_name": "Coinbase Crypto Prob Scanner",
-  "app_version": "4.20.9",
-  "release_type": "semantics_shadow_proof",
-  "tranche_title": "Objective-aligned semantics shadow proof",
-  "tranche_goal": "Keep the live legacy shortlist unchanged, correct the semantics-comparison decision signal so it reflects the app's true objective, and automatically record the contract-aligned semantics challenger in live shadow with resolved outcome review outputs.",
+  "app_version": "4.20.10",
+  "release_type": "semantics_live_promotion",
+  "tranche_title": "Promote the contract-aligned semantics challenger into the live visible-shortlist layer",
+  "tranche_goal": "Swap only the final visible-shortlist semantics from legacy to the proven contract-aligned challenger while preserving the same underlying ranking, Stage 1 path, model bundle, universe, and raw threshold.",
   "objective": "Surface a small, trustworthy visible shortlist that beats the hidden remainder for a quality +2.0% move within 240 minutes.",
   "new_endpoints": [
-    "/api/semantics-shadow-comparison/summary",
-    "/api/semantics-shadow-comparison/summary.txt",
-    "/api/semantics-shadow-comparison/latest-pack.zip",
-    "/api/semantics-shadow-outcome-review/summary",
-    "/api/semantics-shadow-outcome-review/summary.txt",
-    "/api/semantics-shadow-outcome-review/latest-pack.zip"
+    "/api/semantics-promotion-review/summary",
+    "/api/semantics-promotion-review/summary.txt",
+    "/api/semantics-promotion-review/latest-pack.zip"
   ],
   "operator_outputs": [
-    "Semantics Comparison Summary JSON/TXT",
-    "Semantics Comparison Pack ZIP",
-    "Semantics Shadow Comparison Summary JSON/TXT",
-    "Semantics Shadow Comparison Pack ZIP",
-    "Semantics Shadow Outcome Review Summary JSON/TXT",
-    "Semantics Shadow Outcome Review Pack ZIP",
+    "Health JSON/TXT",
+    "Status JSON/TXT",
+    "Control-Ledger Facts JSON/TXT",
+    "Release Manifest JSON/TXT",
+    "Current-Version Summary JSON/TXT",
+    "Current-Version Bundle ZIP",
     "Control-Ledger Ledger Input Pack ZIP",
-    "Current-Version Bundle ZIP"
+    "Semantics Promotion Review Summary JSON/TXT",
+    "Semantics Promotion Review Pack ZIP",
+    "Semantics Shadow Outcome Review Summary JSON/TXT",
+    "Semantics Shadow Outcome Review Pack ZIP"
   ],
   "strategic_boundary": {
     "unchanged_live_runtime": [
-      "no live threshold change",
-      "no Stage 1 mode change",
-      "no retrain promotion",
-      "no live selection-engine change"
+      "raw ranking unchanged",
+      "Stage 1 mode unchanged",
+      "LIVE_RAW_THRESHOLD remains 0.35",
+      "model bundle unchanged",
+      "universe settings unchanged",
+      "no threshold drop to 0.28",
+      "no retrain or model swap"
     ],
     "this_tranche_scope_only": [
-      "objective-aligned semantics recommendation",
-      "contract challenger shadow recording on completed scans",
-      "resolved shadow outcome review outputs"
+      "promote contract-aligned visible shortlist semantics into the live layer",
+      "retain enough operator truth to compare the promoted path against the confirmed 4.20.9 legacy baseline",
+      "keep shadow artifacts available as historical support evidence"
     ]
   },
+  "promotion_baseline_reference": {
+    "baseline_version": "4.20.9",
+    "baseline_live_selection_mode": "legacy",
+    "baseline_stage1_selection_mode": "stage1_opportunity_model",
+    "baseline_live_raw_threshold": 0.35,
+    "visible_rows": 284,
+    "visible_quality_hit_rate": 0.3275,
+    "non_visible_quality_hit_rate": 0.2948,
+    "visible_hidden_quality_gap": 0.0327,
+    "visible_avg_end_ret": 0.008665,
+    "visible_avg_mae": -0.028621,
+    "min_visible_rows_for_guardrail": 30,
+    "source_note": "Confirmed 4.20.9 legacy baseline captured from the controlling Control Ledger for the promotion tranche."
+  },
   "expected_next_evidence": [
-    "latest semantics shadow comparison summary",
-    "latest semantics shadow comparison pack zip",
-    "latest semantics shadow outcome review summary",
-    "latest semantics shadow outcome review pack zip",
-    "latest control-ledger input pack",
-    "next matured current-version bundle once the deployed version has resolved rows"
+    "/health",
+    "/api/status",
+    "/api/control-ledger/facts",
+    "/api/control-ledger/release-manifest",
+    "/api/reviews/current-version-summary",
+    "/api/control-ledger/ledger-input-pack.zip",
+    "the first promoted-version /api/reviews/current-version.zip after a meaningful batch of resolved rows exists",
+    "the promoted-version /api/semantics-promotion-review/summary",
+    "the promoted-version /api/semantics-promotion-review/latest-pack.zip",
+    "the latest semantics shadow outcome review summary",
+    "the latest semantics shadow outcome review pack zip"
   ]
 }

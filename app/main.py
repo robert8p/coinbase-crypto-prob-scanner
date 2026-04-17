@@ -36,6 +36,7 @@ from .shadow_selection_comparison import ShadowSelectionComparisonService
 from .shadow_selection_outcome_review import ShadowSelectionOutcomeReviewService
 from .semantics_shadow_comparison import SemanticsShadowComparisonService
 from .semantics_shadow_outcome_review import SemanticsShadowOutcomeReviewService
+from .semantics_promotion_review import SemanticsPromotionReviewService
 from .utility_tuning_lab import UtilityTuningLabService
 from .utility_model_lab import UtilityModelLabService
 from .utility_model_proof import UtilityModelProofService
@@ -105,6 +106,7 @@ utility_selection_lab = UtilitySelectionLabService(config, replay, review_packs)
 utility_policy_search_lab = UtilityPolicySearchLabService(config, replay, review_packs)
 shadow_selection_outcome_review = ShadowSelectionOutcomeReviewService(config, review_packs, shadow_selection_comparison, utility_policy_search_lab)
 semantics_shadow_outcome_review = SemanticsShadowOutcomeReviewService(config, review_packs, semantics_shadow_comparison)
+semantics_promotion_review = SemanticsPromotionReviewService(config, review_packs)
 utility_tuning_lab = UtilityTuningLabService(config, replay, review_packs)
 utility_model_lab = UtilityModelLabService(config, client)
 utility_model_proof = UtilityModelProofService(config, review_packs)
@@ -1247,6 +1249,30 @@ def api_semantics_shadow_outcome_review_pack():
     pack = semantics_shadow_outcome_review.latest_pack()
     if pack is None:
         raise HTTPException(status_code=404, detail="No semantics shadow outcome review pack available yet")
+    return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
+
+
+@app.get("/api/semantics-promotion-review/summary")
+def api_semantics_promotion_review_summary():
+    return semantics_promotion_review.build_summary(reason="manual")
+
+
+@app.get("/api/semantics-promotion-review/summary.txt")
+def api_semantics_promotion_review_summary_txt():
+    summary = semantics_promotion_review.build_summary(reason="manual_txt")
+    generated = ((summary.get("generated_at_utc") or APP_VERSION).replace(":", "-"))
+    filename = f"semantics_promotion_review_{generated}.txt"
+    return PlainTextResponse(content=json.dumps(summary, indent=2, sort_keys=True, default=str), headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/semantics-promotion-review/latest-pack.zip")
+def api_semantics_promotion_review_pack():
+    pack = semantics_promotion_review.latest_pack()
+    if pack is None:
+        semantics_promotion_review.build_summary(reason="pack_request")
+        pack = semantics_promotion_review.latest_pack()
+    if pack is None:
+        raise HTTPException(status_code=404, detail="No semantics promotion review pack available yet")
     return FileResponse(str(pack), media_type="application/zip", filename=pack.name)
 
 

@@ -69,6 +69,8 @@
       <a href="/api/semantics-shadow-outcome-review/summary.txt"><button type="button">Download Semantics Shadow Outcome TXT</button></a>
       <a href="/api/semantics-shadow-comparison/latest-pack.zip"><button type="button">Download Semantics Shadow Pack</button></a>
       <a href="/api/semantics-shadow-outcome-review/latest-pack.zip"><button type="button">Download Semantics Shadow Outcome Pack</button></a>
+      <a href="/api/semantics-promotion-review/summary.txt"><button type="button">Download Promotion Review TXT</button></a>
+      <a href="/api/semantics-promotion-review/latest-pack.zip"><button type="button">Download Promotion Review Pack</button></a>
       <a href="/api/reviews/post-maturity-bundle.zip"><button type="button">Download Post-Maturity Bundle</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary"><button type="button">Open Fresh Retrain Audit Summary JSON</button></a>
       <a href="/api/reviews/fresh-retrain-audit/summary.txt"><button type="button">Download Fresh Retrain Audit Summary TXT</button></a>
@@ -284,7 +286,7 @@
 
   <h2 style="margin-top:24px;">Semantics Shadow Proof</h2>
   <div class="card">
-    <p class="muted">Evidence-only live shadow for the contract-aligned semantics challenger. The live legacy shortlist remains unchanged while the challenger is measured on the same completed scans.</p>
+    <p class="muted">Historical shadow evidence for the contract-aligned semantics challenger. These artifacts remain useful after promotion because they show the same-scan pre-promotion proof window against legacy.</p>
     <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
       <button id="loadSemanticsShadowSummaryButton" type="button">Load Semantics Shadow Summary</button>
       <button id="downloadSemanticsShadowPackButton" type="button">Download Semantics Shadow Pack</button>
@@ -293,10 +295,24 @@
       <button id="downloadSemanticsShadowOutcomePackButton" type="button">Download Shadow Outcome Pack</button>
       <a href="/api/semantics-shadow-outcome-review/summary.txt"><button type="button">Download Shadow Outcome TXT</button></a>
     </div>
-    <p class="small muted" style="margin-top:0;">This tranche does not change the live shortlist. It only records whether the contract-aligned semantics challenger survives a real resolved proof window on the same scans.</p>
+    <p class="small muted" style="margin-top:0;">After promotion, use the promotion review for the live keep-versus-rollback decision. Use these retained shadow artifacts only as the proof history that justified the promotion.</p>
     <div id="semanticsShadowMessage" class="muted" style="margin-bottom:10px;"></div>
     <div id="semanticsShadowPanel"><p class="muted">No semantics shadow summary loaded yet.</p></div>
     <div id="semanticsShadowOutcomePanel" style="margin-top:12px;"><p class="muted">No semantics shadow outcome review loaded yet.</p></div>
+  </div>
+
+
+  <h2 style="margin-top:24px;">Semantics Promotion Review</h2>
+  <div class="card">
+    <p class="muted">Post-promotion guardrail review for the live contract-aligned shortlist. It compares the promoted current-version evidence against the confirmed 4.20.9 legacy baseline and recommends rollback only if the promoted path underperforms on the required guardrail metrics.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <button id="loadSemanticsPromotionReviewButton" type="button">Load Promotion Review</button>
+      <button id="downloadSemanticsPromotionReviewPackButton" type="button">Download Promotion Review Pack</button>
+      <a href="/api/semantics-promotion-review/summary.txt"><button type="button">Download Promotion Review TXT</button></a>
+    </div>
+    <p class="small muted" style="margin-top:0;">This is the live keep-versus-rollback guardrail for the promoted shortlist semantics. It does not change Stage 1, the model, the universe, or the raw threshold.</p>
+    <div id="semanticsPromotionReviewMessage" class="muted" style="margin-bottom:10px;"></div>
+    <div id="semanticsPromotionReviewPanel"><p class="muted">No semantics promotion review loaded yet.</p></div>
   </div>
 
 
